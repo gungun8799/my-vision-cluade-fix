@@ -31,13 +31,32 @@ Service Express typically has simple lease terms without year-by-year variations
 - "1 กรกฎาคม 2568" = "01-Jul-2025" → MATCH ✅
 - Handle Thai months: มกราคม=Jan, กุมภาพันธ์=Feb, มีนาคม=Mar, เมษายน=Apr, พฤษภาคม=May, มิถุนายน=Jun, กรกฎาคม=Jul, สิงหาคม=Aug, กันยายน=Sep, ตุลาคม=Oct, พฤศจิกายน=Nov, ธันวาคม=Dec
 
-Return format:
+**CRITICAL**: You MUST compare ALL the fields listed above and return them as a JSON ARRAY. Do not return a single object.
+
+Return format (JSON ARRAY with ALL fields):
 [
   {
-    "field": "Field name",
+    "field": "Lease Type",
     "pdf": "PDF value", 
     "web": "Web value",
     "match": true or false,
-    "reason": "Explanation of comparison logic (mention calendar conversion if applicable)"
+    "reason": "Explanation of comparison logic"
+  },
+  {
+    "field": "Billing Frequency",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  },
+  {
+    "field": "Year 1 : Contract Start date",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Date comparison with calendar conversion if needed"
   }
+  // ... continue for ALL fields listed above
 ]
+
+**REQUIREMENT**: The response MUST be a JSON array containing comparison results for ALL fields mentioned in this prompt.

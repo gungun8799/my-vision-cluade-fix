@@ -36,16 +36,15 @@ function stripThinkTags(response) {
   if (cleaned.includes('<think>')) {
     console.log('[DEBUG stripThinkTags] Found unclosed think tag');
     
-    // Look for JSON array or object after any <think> tag
-    const jsonMatch = cleaned.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-    if (jsonMatch) {
-      console.log('[DEBUG stripThinkTags] Found JSON content, preserving it');
-      cleaned = jsonMatch[0];
-    } else {
-      // If no JSON found, still try to remove the unclosed think section
-      console.log('[DEBUG stripThinkTags] No JSON found, removing unclosed think section');
-      cleaned = cleaned.replace(/<think>[\s\S]*$/gi, '');
-    }
+    // Remove the unclosed think tag and everything before it
+    cleaned = cleaned.replace(/^[\s\S]*?<think>[\s\S]*?(?=[\[\{])/i, '');
+  }
+  
+  // Try to extract valid JSON using bracket/brace counting
+  const extractedJson = extractValidJson(cleaned);
+  if (extractedJson) {
+    console.log('[DEBUG stripThinkTags] Successfully extracted JSON using bracket counting');
+    cleaned = extractedJson;
   }
   
   const result = cleaned.trim();
@@ -53,6 +52,117 @@ function stripThinkTags(response) {
   console.log('[DEBUG stripThinkTags] Output preview:', result.substring(0, 200));
   
   return result;
+}
+
+function extractValidJson(text) {
+  if (!text || typeof text !== 'string') {
+    return null;
+  }
+  
+  // Look for potential JSON start positions - arrays or objects
+  const potentialStarts = [];
+  
+  // Find all potential array starts
+  let pos = 0;
+  while ((pos = text.indexOf('[', pos)) !== -1) {
+    potentialStarts.push({ pos, type: 'array' });
+    pos++;
+  }
+  
+  // Find all potential object starts
+  pos = 0;
+  while ((pos = text.indexOf('{', pos)) !== -1) {
+    potentialStarts.push({ pos, type: 'object' });
+    pos++;
+  }
+  
+  // Sort by position
+  potentialStarts.sort((a, b) => a.pos - b.pos);
+  
+  // Try each potential start position
+  for (const start of potentialStarts) {
+    console.log(`[DEBUG extractValidJson] Trying ${start.type} at position ${start.pos}`);
+    
+    const jsonStr = tryExtractJsonFromPosition(text, start.pos, start.type === 'array');
+    if (jsonStr) {
+      console.log(`[DEBUG extractValidJson] Successfully extracted JSON from position ${start.pos}`);
+      return jsonStr;
+    }
+  }
+  
+  console.log('[DEBUG extractValidJson] No valid JSON found');
+  return null;
+}
+
+function tryExtractJsonFromPosition(text, startPos, isArray) {
+  const openChar = isArray ? '[' : '{';
+  const closeChar = isArray ? ']' : '}';
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  
+  for (let i = startPos; i < text.length; i++) {
+    const char = text[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (char === '"' && !escapeNext) {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === openChar) {
+        depth++;
+      } else if (char === closeChar) {
+        depth--;
+        if (depth === 0) {
+          // Found complete JSON candidate
+          const jsonStr = text.substring(startPos, i + 1);
+          console.log(`[DEBUG tryExtractJsonFromPosition] Found complete structure, length: ${jsonStr.length}`);
+          
+          // Validate it's actually valid JSON
+          try {
+            const parsed = JSON.parse(jsonStr);
+            
+            // For arrays, make sure it contains objects (validation results)
+            if (isArray && Array.isArray(parsed) && parsed.length > 0) {
+              // Check if first element looks like a validation result
+              const firstElement = parsed[0];
+              if (typeof firstElement === 'object' && 
+                  firstElement !== null && 
+                  ('field' in firstElement || 'status' in firstElement || 'match' in firstElement)) {
+                console.log('[DEBUG tryExtractJsonFromPosition] Array contains validation-like objects');
+                return jsonStr;
+              }
+            }
+            
+            // For objects, accept if it parses correctly
+            if (!isArray && typeof parsed === 'object' && parsed !== null) {
+              console.log('[DEBUG tryExtractJsonFromPosition] Valid object found');
+              return jsonStr;
+            }
+            
+            console.log('[DEBUG tryExtractJsonFromPosition] JSON structure doesn\'t look like validation data');
+          } catch (e) {
+            console.log('[DEBUG tryExtractJsonFromPosition] JSON validation failed:', e.message);
+          }
+          
+          return null; // This position didn't work, but don't continue counting
+        }
+      }
+    }
+  }
+  
+  return null; // Incomplete structure
 }
 
 
@@ -883,7 +993,10 @@ app.post('/api/scrape-url-sequential', async (req, res) => {
             timeout: 0 // No timeout - wait indefinitely
           });
 
-          const meterResponse = response.data.choices[0].message.content.trim();
+          // Handle new API response format where content might be in reasoning_content
+          const messageContent = response.data.choices[0].message.content;
+          const reasoningContent = response.data.choices[0].message.reasoning_content;
+          const meterResponse = (messageContent || reasoningContent).trim();
           console.log('[Sequential Meter Validation] Lotus LLM response:', meterResponse);
 
           try {
@@ -1314,7 +1427,7 @@ app.post('/api/scrape-url', async (req, res) => {
       
       // Use Lotus LLM API instead of Gemini for web scraping
       const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-      const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+      const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
       
       let geminiText;
       const maxRetries = 3;
@@ -1345,7 +1458,10 @@ app.post('/api/scrape-url', async (req, res) => {
             timeout: 0 // No timeout - wait indefinitely
           });
           
-          geminiText = stripThinkTags(response.data.choices[0].message.content);
+          // Handle new API response format where content might be in reasoning_content
+          const messageContent = response.data.choices[0].message.content;
+          const reasoningContent = response.data.choices[0].message.reasoning_content;
+          geminiText = stripThinkTags(messageContent || reasoningContent);
           console.log('[✅ Lotus LLM web scraping successful]');
           break;
         } catch (fetchError) {
@@ -1788,7 +1904,7 @@ app.post('/api/gemini-compare', async (req, res) => {
     
     // Use Lotus LLM API instead of Gemini for comparison
     const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+    const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
     
     // Process each category separately to avoid overload
     const allResults = [];
@@ -1839,7 +1955,10 @@ app.post('/api/gemini-compare', async (req, res) => {
           timeout: 10800000 // 3 hours timeout (effectively infinite)
         });
         
-        const categoryResult = response.data.choices[0].message.content;
+        // Handle new API response format where content might be in reasoning_content
+        const messageContent = response.data.choices[0].message.content;
+        const reasoningContent = response.data.choices[0].message.reasoning_content;
+        const categoryResult = messageContent || reasoningContent;
         console.log(`[✅ Category ${category} processed successfully]`);
         console.log(`[🔍 ${category} raw response length:`, categoryResult.length);
         console.log(`[🔍 ${category} response preview:`, categoryResult.substring(0, 500) + '...');
@@ -1859,6 +1978,36 @@ app.post('/api/gemini-compare', async (req, res) => {
         // Remove any stray backticks
         cleanedResult = cleanedResult.replace(/`/g, '').trim();
         
+        // Additional cleanup for malformed JSON
+        // Handle case where there might be duplicate JSON arrays or extra content
+        if (cleanedResult.includes('][')) {
+          console.log(`[🔧 ${category}] Found duplicate arrays, taking first valid array`);
+          const firstArrayEnd = cleanedResult.indexOf('][');
+          cleanedResult = cleanedResult.substring(0, firstArrayEnd + 1);
+        }
+        
+        // Find the first complete JSON array if there's extra content after
+        const firstBracket = cleanedResult.indexOf('[');
+        if (firstBracket !== -1) {
+          let bracketCount = 0;
+          let endPos = firstBracket;
+          
+          for (let i = firstBracket; i < cleanedResult.length; i++) {
+            if (cleanedResult[i] === '[') bracketCount++;
+            else if (cleanedResult[i] === ']') bracketCount--;
+            
+            if (bracketCount === 0) {
+              endPos = i + 1;
+              break;
+            }
+          }
+          
+          if (endPos < cleanedResult.length) {
+            console.log(`[🔧 ${category}] Trimming extra content after JSON array`);
+            cleanedResult = cleanedResult.substring(firstBracket, endPos);
+          }
+        }
+        
         // Parse and merge results
         try {
           const parsed = JSON.parse(cleanedResult);
@@ -1866,38 +2015,82 @@ app.post('/api/gemini-compare', async (req, res) => {
             console.log(`[✅ ${category} parsed successfully - ${parsed.length} fields]`);
             console.log(`[📊 ${category} fields:`, parsed.map(p => p.field).join(', '));
             allResults.push(...parsed);
+          } else if (parsed && typeof parsed === 'object' && parsed.field) {
+            // Handle single object response - wrap it in an array
+            console.warn(`[⚠️ Category ${category} returned single object instead of array - wrapping it]`);
+            console.log(`[✅ ${category} parsed successfully - 1 field (wrapped)]`);
+            console.log(`[📊 ${category} fields:`, parsed.field);
+            allResults.push(parsed);
           } else {
-            console.warn(`[⚠️ Category ${category} did not return an array]`);
+            console.warn(`[⚠️ Category ${category} did not return an array or valid object]`);
           }
         } catch (parseErr) {
           console.warn(`[⚠️ Failed to parse category ${category} results]`, parseErr.message);
-          console.warn(`[🔍 Raw response preview for ${category}]:`, cleanedResult.substring(0, 200) + '...');
           
-          // Try to salvage partial JSON if it's truncated
-          if (parseErr.message.includes('Unterminated string') || parseErr.message.includes('Unexpected end')) {
-            console.log(`[🩹 Attempting to fix truncated JSON for ${category}]`);
+          // Handle truncated JSON by finding last complete object
+          if (parseErr.message.includes('Unexpected end of JSON input') || parseErr.message.includes('Unterminated')) {
+            console.log(`[🩹 ${category}] Attempting to fix truncated JSON`);
+            
             try {
-              // Try to close the JSON properly by finding the last complete object
-              let salvaged = cleanedResult;
+              // Find the last complete object by looking for complete "}," or "}" patterns
+              let truncatedResult = cleanedResult;
               
-              // Find the last complete field entry
-              const lastCompleteIndex = salvaged.lastIndexOf('}');
-              if (lastCompleteIndex > 0) {
-                salvaged = salvaged.substring(0, lastCompleteIndex + 1);
-                // Ensure it ends with proper array closing
-                if (!salvaged.trim().endsWith(']')) {
-                  salvaged = salvaged + ']';
+              // Find the last complete object ending
+              let lastCompleteEnd = -1;
+              let braceCount = 0;
+              let inString = false;
+              let escapeNext = false;
+              
+              for (let i = 0; i < truncatedResult.length; i++) {
+                const char = truncatedResult[i];
+                
+                if (escapeNext) {
+                  escapeNext = false;
+                  continue;
                 }
                 
-                const salvagedParsed = JSON.parse(salvaged);
-                if (Array.isArray(salvagedParsed)) {
-                  allResults.push(...salvagedParsed);
-                  console.log(`[✅ Salvaged ${salvagedParsed.length} fields from ${category}]`);
+                if (char === '\\' && inString) {
+                  escapeNext = true;
+                  continue;
+                }
+                
+                if (char === '"' && !escapeNext) {
+                  inString = !inString;
+                  continue;
+                }
+                
+                if (!inString) {
+                  if (char === '{') braceCount++;
+                  else if (char === '}') {
+                    braceCount--;
+                    if (braceCount === 0) {
+                      lastCompleteEnd = i;
+                    }
+                  }
                 }
               }
+              
+              if (lastCompleteEnd > 0) {
+                // Trim to last complete object and close array
+                const fixedJson = truncatedResult.substring(0, lastCompleteEnd + 1) + '\n]';
+                console.log(`[🔧 ${category}] Fixed JSON length: ${fixedJson.length}`);
+                
+                const fixedParsed = JSON.parse(fixedJson);
+                if (Array.isArray(fixedParsed)) {
+                  console.log(`[✅ ${category} SALVAGED - ${fixedParsed.length} fields from truncated response]`);
+                  console.log(`[📊 ${category} salvaged fields:`, fixedParsed.map(p => p.field).join(', '));
+                  allResults.push(...fixedParsed);
+                } else {
+                  console.warn(`[⚠️ ${category}] Salvaged result is not an array`);
+                }
+              } else {
+                console.warn(`[❌ ${category}] Could not find any complete objects in truncated JSON`);
+              }
             } catch (salvageErr) {
-              console.warn(`[❌ Could not salvage ${category} results]`, salvageErr.message);
+              console.warn(`[❌ ${category}] Failed to salvage truncated JSON:`, salvageErr.message);
             }
+          } else {
+            console.warn(`[🔍 Raw response preview for ${category}]:`, cleanedResult.substring(0, 200) + '...');
           }
         }
         
@@ -2047,13 +2240,15 @@ app.post('/api/validate-modular', async (req, res) => {
     
     // Use Lotus LLM API for validation
     const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+    const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
     
     // Process each validation category separately
     const allValidationResults = [];
     console.log(`[🔄 Using chunked Lotus LLM validation for ${sourceType}]`);
     
     for (const category of validationCategories) {
+      let finalPrompt; // Declare outside try block so catch can access it
+      
       try {
         console.log(`[📊 Processing validation category: ${category}]`);
         let categoryPrompt = promptManager.createValidationPrompt(category, contractType, contractNumber, sourceType);
@@ -2110,7 +2305,7 @@ app.post('/api/validate-modular', async (req, res) => {
           }
         }
         
-        const finalPrompt = `${categoryPrompt}\n\nContract Data:\n${JSON.stringify(extractedData, null, 2)}`;
+        finalPrompt = `${categoryPrompt}\n\nContract Data:\n${JSON.stringify(extractedData, null, 2)}`;
         
         // Add delay between requests to avoid overload
         if (allValidationResults.length > 0) {
@@ -2139,7 +2334,10 @@ app.post('/api/validate-modular', async (req, res) => {
           timeout: 10800000 // 3 hours timeout (effectively infinite)
         });
         
-        const categoryResult = response.data.choices[0].message.content;
+        // Handle new API response format where content might be in reasoning_content
+        const messageContent = response.data.choices[0].message.content;
+        const reasoningContent = response.data.choices[0].message.reasoning_content;
+        const categoryResult = messageContent || reasoningContent;
         console.log(`[✅ Validation category ${category} processed successfully]`);
         
         // Strip think tags first, then clean the response
@@ -2155,6 +2353,36 @@ app.post('/api/validate-modular', async (req, res) => {
         
         // Remove any stray backticks
         cleanedResult = cleanedResult.replace(/`/g, '').trim();
+        
+        // Additional cleanup for malformed JSON
+        // Handle case where there might be duplicate JSON arrays or extra content
+        if (cleanedResult.includes('][')) {
+          console.log(`[🔧 Validation ${category}] Found duplicate arrays, taking first valid array`);
+          const firstArrayEnd = cleanedResult.indexOf('][');
+          cleanedResult = cleanedResult.substring(0, firstArrayEnd + 1);
+        }
+        
+        // Find the first complete JSON array if there's extra content after
+        const firstBracket = cleanedResult.indexOf('[');
+        if (firstBracket !== -1) {
+          let bracketCount = 0;
+          let endPos = firstBracket;
+          
+          for (let i = firstBracket; i < cleanedResult.length; i++) {
+            if (cleanedResult[i] === '[') bracketCount++;
+            else if (cleanedResult[i] === ']') bracketCount--;
+            
+            if (bracketCount === 0) {
+              endPos = i + 1;
+              break;
+            }
+          }
+          
+          if (endPos < cleanedResult.length) {
+            console.log(`[🔧 Validation ${category}] Trimming extra content after JSON array`);
+            cleanedResult = cleanedResult.substring(firstBracket, endPos);
+          }
+        }
         
         // Parse and merge results
         try {
@@ -2223,21 +2451,36 @@ app.post('/api/validate-modular', async (req, res) => {
         if (err.response && err.response.status === 504) {
           console.log(`[🔄 Retrying ${category} with reduced token limit due to 504 timeout]`);
           try {
-            // Retry with smaller max_tokens to avoid gateway timeout
+            // Safety check for finalPrompt
+            if (!finalPrompt) {
+              console.warn(`[⚠️ ${category}] finalPrompt is undefined, skipping retry`);
+              continue;
+            }
+            
+            // Create a shortened prompt for retry to avoid timeout
+            const shortenedPrompt = `Validate contract fields and return JSON array. Be very concise.
+
+Fields to validate: ${category}
+
+Data: ${finalPrompt.substring(finalPrompt.indexOf('Data:') + 5, finalPrompt.indexOf('Data:') + 1500)}...
+
+Return format: [{"field":"name","value":"val","valid":true/false,"reason":"brief"}]`;
+
+            // Retry with very small max_tokens to avoid gateway timeout  
             const retryResponse = await axios.post(LOTUS_LLM_URL, {
               model: 'default',
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a contract validation assistant. Return ONLY a valid JSON array. Be concise.'
+                  content: 'Return ONLY valid JSON array. Be extremely concise.'
                 },
                 {
                   role: 'user',
-                  content: finalPrompt
+                  content: shortenedPrompt
                 }
               ],
               temperature: 0.1,
-              max_tokens: 2000 // Reduced from 6000 to 2000
+              max_tokens: 1000 // Further reduced to 1000
             }, {
               headers: {
                 'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -2588,7 +2831,7 @@ console.log('[Utility] scraped raw after combined search:', utilityRaw);
           
           // Use Lotus LLM API for meter validation
           const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-          const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+          const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
           
           try {
             const response = await axios.post(LOTUS_LLM_URL, {
@@ -2607,7 +2850,10 @@ console.log('[Utility] scraped raw after combined search:', utilityRaw);
               timeout: 0 // No timeout - wait indefinitely
             });
 
-            let mText = response.data.choices[0].message.content.trim();
+            // Handle new API response format where content might be in reasoning_content
+            const messageContent = response.data.choices[0].message.content;
+            const reasoningContent = response.data.choices[0].message.reasoning_content;
+            let mText = (messageContent || reasoningContent).trim();
             if (mText.startsWith('```json')) mText = mText.slice(7);
             if (mText.endsWith('```')) mText = mText.slice(0, -3);
 
@@ -4001,7 +4247,7 @@ app.post('/api/contract-classify', async (req, res) => {
 
     // Use Lotus LLM API instead of Gemini
     const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+    const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
 
     let text;
     const maxRetries = 3;
@@ -4032,7 +4278,10 @@ app.post('/api/contract-classify', async (req, res) => {
           timeout: 0 // No timeout - wait indefinitely
         });
 
-        text = response.data.choices[0].message.content;
+        // Handle new API response format where content might be in reasoning_content
+        const messageContent = response.data.choices[0].message.content;
+        const reasoningContent = response.data.choices[0].message.reasoning_content;
+        text = messageContent || reasoningContent;
         console.log('[✅ Contract classification Lotus LLM API call successful]');
         break;
       } catch (fetchError) {
@@ -4040,31 +4289,62 @@ app.post('/api/contract-classify', async (req, res) => {
         
         if (attempt === maxRetries) {
           console.error('[❌ All contract classification attempts failed]');
+          
+          // Fallback: Use rule-based classification when Lotus LLM is unavailable
+          if (fetchError.response && (fetchError.response.status === 503 || fetchError.response.status === 502)) {
+            console.log('[🔄 Lotus LLM unavailable (503/502), using fallback rule-based classification]');
+            
+            // Simple rule-based classification based on content patterns
+            const content = fullPrompt.toLowerCase();
+            let contractType = 'permanent_fixed'; // default
+            
+            // Check for service express indicators
+            if (content.includes('service express') || content.includes('service_express') || 
+                content.includes('monthly service') && content.includes('short term')) {
+              contractType = 'service_express';
+            }
+            
+            console.log('[✅ Fallback classification completed]', { contractType });
+            return res.json({ contractType });
+          }
+          
           throw new Error(`Contract classification Lotus LLM API failed after ${maxRetries} attempts: ${fetchError.message}`);
         }
         
-        // Wait before retry (exponential backoff)
-        const waitTime = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
+        // Wait before retry (longer wait for 503/502 service unavailable errors)
+        let waitTime;
+        if (fetchError.response && (fetchError.response.status === 503 || fetchError.response.status === 502)) {
+          waitTime = 5000 * attempt; // 5s, 10s, 15s for service unavailable
+        } else {
+          waitTime = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s for other errors
+        }
         console.log(`[⏳ Contract classification waiting ${waitTime}ms before retry...]`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
 
-    // Clean and parse
-    let raw = text.trim();
-    if (raw.startsWith('```json')) raw = raw.slice(7);
-    if (raw.endsWith('```')) raw = raw.slice(0, -3);
+    // Handle successful LLM response
+    if (text) {
+      // Clean and parse LLM response
+      let raw = text.trim();
+      if (raw.startsWith('```json')) raw = raw.slice(7);
+      if (raw.endsWith('```')) raw = raw.slice(0, -3);
 
-    const jsonBlock = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-    const parsed = JSON.parse(jsonBlock);
+      const jsonBlock = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+      const parsed = JSON.parse(jsonBlock);
 
-    const contractType = parsed?.contractType?.trim() || parsed?.['Contract Type']?.trim();
-    if (!contractType) {
-      console.error('[Contract Classification] Parsed response:', parsed);
-      throw new Error('No contractType found in Gemini output');
+      const contractType = parsed?.contractType?.trim() || parsed?.['Contract Type']?.trim();
+      if (!contractType) {
+        console.error('[Contract Classification] Parsed response:', parsed);
+        throw new Error('No contractType found in LLM output');
+      }
+
+      res.json({ contractType });
+    } else {
+      // This should not happen due to fallback, but just in case
+      console.error('[Contract Classification] No response text available');
+      throw new Error('No classification response available');
     }
-
-    res.json({ contractType });
   } catch (err) {
     console.error('[❌ Contract Classification Error]', err);
     res.status(500).json({ error: err.message });
@@ -4229,7 +4509,7 @@ app.post('/api/meter-check', async (req, res) => {
       console.log('[Meter Check] sending to Lotus LLM');
       
       const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-      const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+      const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
       
       const response = await axios.post(LOTUS_LLM_URL, {
         model: 'default',
@@ -4249,7 +4529,10 @@ app.post('/api/meter-check', async (req, res) => {
         timeout: 0 // No timeout - wait indefinitely
       });
 
-      const meterResponse = response.data.choices[0].message.content.trim();
+      // Handle new API response format where content might be in reasoning_content
+      const messageContent = response.data.choices[0].message.content;
+      const reasoningContent = response.data.choices[0].message.reasoning_content;
+      const meterResponse = (messageContent || reasoningContent).trim();
       console.log('[Meter Check] Lotus LLM response received');
 
       try {

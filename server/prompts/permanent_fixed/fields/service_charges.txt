@@ -1,17 +1,22 @@
 Extract service charge information and return in JSON format.
 
+**CRITICAL MAPPING RULES:**
+- "Common Area Cool Air Service Fee" → Map to "Common area" fields, NOT "in the renting space" fields
+- Only map charges to "in the renting space" if they are specifically for the tenant's individual space, NOT common area services
+- If only "Common Area Cool Air Service Fee" exists, all "in the renting space" fields should be NULL
+
 Required fields:
 "Other service charge before tax (in the renting space)" - Service charge amount for renting space
 
-"Other service charge (in the renting space) Charge description" - Often "ค่าบริการสำหรับไอเย็น" which means "Common Area Cool Air Service Fee". If "Other service charge (in the renting space)" is 0, this field can be null.
+"Other service charge (in the renting space) Charge description" - CRITICAL: Only extract if there is a specific charge for "in the renting space" that is NOT "Common Area Cool Air Service Fee". If only "Common Area Cool Air Service Fee" exists, this should be NULL.
 
-"Other service charge (in the renting space) start date" - If Other service charge is not null, use contract start date
+"Other service charge (in the renting space) start date" - CRITICAL: Only extract if "Other service charge (in the renting space)" amount is greater than 0 and has a specific non-common-area charge. If only "Common Area Cool Air Service Fee" exists, this should be NULL.
 
-"Other service charge (in the renting space) end date" - If Other service charge is not null, use contract end date
+"Other service charge (in the renting space) end date" - CRITICAL: Only extract if "Other service charge (in the renting space)" amount is greater than 0 and has a specific non-common-area charge. If only "Common Area Cool Air Service Fee" exists, this should be NULL.
 
-"Other service charge before tax (Common area)" - Service charge for common area
+"Other service charge before tax (Common area)" - Service charge for common area. EXTRACT: "Common Area Cool Air Service Fee" charges should be mapped here, NOT to "in the renting space".
 
-"Other service charge (Common area) Charge description" - Often "ค่าบริการสำหรับไอเย็น" meaning "Common Area Cool Air Service Fee"
+"Other service charge (Common area) Charge description" - EXTRACT: "Common Area Cool Air Service Fee" should be mapped to this field, NOT to "in the renting space" description.
 
 "Other service charge (Common area) start date" - If Other service charge is not null, use contract start date
 

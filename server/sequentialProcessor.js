@@ -11,14 +11,144 @@ function stripThinkTags(response) {
     return response;
   }
   
-  // Remove everything between <think> and </think> tags (including the tags themselves)
-  // This handles both single-line and multi-line thinking sections
+  console.log('[DEBUG stripThinkTags] Input length:', response.length);
+  console.log('[DEBUG stripThinkTags] First 200 chars:', response.substring(0, 200));
+  console.log('[DEBUG stripThinkTags] Last 200 chars:', response.substring(response.length - 200));
+  
+  // First, remove properly closed <think>...</think> tags
   let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
   
-  // Also handle unclosed think tags - remove from <think> to end of response
-  cleaned = cleaned.replace(/<think>[\s\S]*$/gi, '');
+  // For unclosed think tags, try to preserve JSON content that comes after
+  if (cleaned.includes('<think>')) {
+    console.log('[DEBUG stripThinkTags] Found unclosed think tag');
+    
+    // Remove the unclosed think tag and everything before it
+    cleaned = cleaned.replace(/^[\s\S]*?<think>[\s\S]*?(?=[\[\{])/i, '');
+  }
   
-  return cleaned.trim();
+  // Try to extract valid JSON using bracket/brace counting
+  const extractedJson = extractValidJson(cleaned);
+  if (extractedJson) {
+    console.log('[DEBUG stripThinkTags] Successfully extracted JSON using bracket counting');
+    cleaned = extractedJson;
+  }
+  
+  const result = cleaned.trim();
+  console.log('[DEBUG stripThinkTags] Output length:', result.length);
+  console.log('[DEBUG stripThinkTags] Output preview:', result.substring(0, 200));
+  
+  return result;
+}
+
+function extractValidJson(text) {
+  if (!text || typeof text !== 'string') {
+    return null;
+  }
+  
+  // Look for potential JSON start positions - arrays or objects
+  const potentialStarts = [];
+  
+  // Find all potential array starts
+  let pos = 0;
+  while ((pos = text.indexOf('[', pos)) !== -1) {
+    potentialStarts.push({ pos, type: 'array' });
+    pos++;
+  }
+  
+  // Find all potential object starts
+  pos = 0;
+  while ((pos = text.indexOf('{', pos)) !== -1) {
+    potentialStarts.push({ pos, type: 'object' });
+    pos++;
+  }
+  
+  // Sort by position
+  potentialStarts.sort((a, b) => a.pos - b.pos);
+  
+  // Try each potential start position
+  for (const start of potentialStarts) {
+    console.log(`[DEBUG extractValidJson] Trying ${start.type} at position ${start.pos}`);
+    
+    const jsonStr = tryExtractJsonFromPosition(text, start.pos, start.type === 'array');
+    if (jsonStr) {
+      console.log(`[DEBUG extractValidJson] Successfully extracted JSON from position ${start.pos}`);
+      return jsonStr;
+    }
+  }
+  
+  console.log('[DEBUG extractValidJson] No valid JSON found');
+  return null;
+}
+
+function tryExtractJsonFromPosition(text, startPos, isArray) {
+  const openChar = isArray ? '[' : '{';
+  const closeChar = isArray ? ']' : '}';
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  
+  for (let i = startPos; i < text.length; i++) {
+    const char = text[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (char === '"' && !escapeNext) {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === openChar) {
+        depth++;
+      } else if (char === closeChar) {
+        depth--;
+        if (depth === 0) {
+          // Found complete JSON candidate
+          const jsonStr = text.substring(startPos, i + 1);
+          console.log(`[DEBUG tryExtractJsonFromPosition] Found complete structure, length: ${jsonStr.length}`);
+          
+          // Validate it's actually valid JSON
+          try {
+            const parsed = JSON.parse(jsonStr);
+            
+            // For arrays, make sure it contains objects (validation results)
+            if (isArray && Array.isArray(parsed) && parsed.length > 0) {
+              // Check if first element looks like a validation result
+              const firstElement = parsed[0];
+              if (typeof firstElement === 'object' && 
+                  firstElement !== null && 
+                  ('field' in firstElement || 'status' in firstElement || 'match' in firstElement)) {
+                console.log('[DEBUG tryExtractJsonFromPosition] Array contains validation-like objects');
+                return jsonStr;
+              }
+            }
+            
+            // For objects, accept if it parses correctly
+            if (!isArray && typeof parsed === 'object' && parsed !== null) {
+              console.log('[DEBUG tryExtractJsonFromPosition] Valid object found');
+              return jsonStr;
+            }
+            
+            console.log('[DEBUG tryExtractJsonFromPosition] JSON structure doesn\'t look like validation data');
+          } catch (e) {
+            console.log('[DEBUG tryExtractJsonFromPosition] JSON validation failed:', e.message);
+          }
+          
+          return null; // This position didn't work, but don't continue counting
+        }
+      }
+    }
+  }
+  
+  return null; // Incomplete structure
 }
 
 // Verify API key is loaded

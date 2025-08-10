@@ -1,42 +1,44 @@
 Validate required fields for PERMANENT FIXED contracts from WEB scraped data. Return JSON array of validation results.
 
+**IMPORTANT**: Only validate the essential web fields listed below. Do not validate fields not in this list.
+
 Web-specific validation rules for required fields:
 
-"Contract Number" - Must be present and match format "xxxx_LOxxxx_xxxxx" or "xxxx_LRxxxx_xxxxx"
-
-"Workflow status" - Must be present (e.g., "ACCEPTED", "PENDING", etc.)
+"Contract Number" - Must be present and match format
 
 "Customer Name" - Must be present in web data
 
-"Brand Name" - Must be present and match extracted brand name
-
-"Tenant Type" - Must be present (e.g., "PN3 - PN Car Service & Maintenance")
-
-"Unit ID" - Must be present in format PXXXX
-
-"Building ID" - Must be present as 4-digit number
+"Brand Name" - Must be present (may appear twice in list, validate both instances)
 
 "Building Name" - Must be present and contain building information
 
-"Property Type" - Must be present (e.g., "Hypermarket", "Service Mall")
-
-"Space Design Type" - Must be present and match tenant category
+"Unit ID" - Must be present in format PXXXX
 
 "Space (NLA)" - Must be present as numerical value
 
-"Monthly Rental Rate" - Must be present as numerical value in web data
-
-"Net Rent (p.m.)" - Must be present as numerical value
-
-"Billing option" - Must be present (e.g., "Monthly", "Quarterly")
-
-"Billing Frequency" - Must be present (e.g., "Monthly")
-
-"Payment Term" - Must be present as number of days
-
-"Rental Ratio" - Must be present as percentage value
+"Monthly Rental Rate" - Must be present as numerical value (may appear twice in list, validate both instances)
 
 "Lease Type" - Must match contract type (Permanent Fixed)
+
+"Building ID" - Must be present as 4-digit number
+
+"อยู่กองทรัสต์หรือไม่" - Must be present ("Yes" or "No")
+
+"Customer Type" - Must be present 
+
+"Space Design Type" - Must be present and match tenant category
+
+"Unit Status" - Must be present
+
+"Proposed lease commencement date" - Must be present as valid date
+
+"Proposed lease expiry date" - Must be present as valid date
+
+"Monthly Service Rate" - Must be present as numerical value
+
+"Rental Deposit" - Must be present as numerical value
+
+"Service Deposit" - Must be present as numerical value
 
 **WEB-SPECIFIC RULES:**
 - Web data may have different field names than PDF

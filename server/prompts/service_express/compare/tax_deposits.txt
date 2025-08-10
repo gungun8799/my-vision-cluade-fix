@@ -1,23 +1,22 @@
-Compare tax and deposit information between PDF and Web sources. Return JSON array of comparison results.
+Compare lease property tax information between PDF and Web sources. Return JSON array of comparison results.
 
-Compare these fields:
+Compare this field:
 
-"Lease property tax" - always mark as match True. 
-
-"Deposits Amount" - Mark as "Valid" if numbers are the same, ignore decimal points
+"Lease property tax" - always mark as match True for service_express contracts.
 
 Validation Logic:
-- For tax rates, exact matching is required based on web value type
-- For deposits, numeric equivalence (ignoring decimal formatting)
-- Missing values in either source = false match
+- For service_express contracts, lease property tax comparison always returns true
+- Missing values in either source still return true for this contract type
+
+NOTE: Deposit amounts are handled in the lease_terms category, not here.
 
 Return format:
 [
   {
-    "field": "Field name", 
+    "field": "Lease property tax", 
     "pdf": "PDF value",
     "web": "Web value",
-    "match": true or false,
-    "reason": "Tax rule applied OR deposit comparison result"
+    "match": true,
+    "reason": "Service Express contract - tax comparison always passes"
   }
 ]

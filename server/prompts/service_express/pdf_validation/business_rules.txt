@@ -10,6 +10,16 @@ Validation Rules:
 
 "Include Utility" - Valid if value == "Yes" or "No". If null/empty: invalid "Include Utility is missing". If not "Yes" or "No": invalid "Include Utility ('<value>') must be 'Yes' or 'No'". Else valid "Include Utility is '<value>'"
 
+"Tenant selection" - Valid if non-null. If null/empty: invalid "Tenant selection is missing", else valid "Tenant selection present"
+
+"Monthly Rental Rate" - Valid if numeric and > 0. If null/non-numeric/≤ 0: invalid "Monthly Rental Rate ('<value>') is not a positive number". Else valid "Monthly Rental Rate is valid"
+
+"Monthly Service Rate" - Valid if numeric and ≥ 0. If null/non-numeric/< 0: invalid "Monthly Service Rate ('<value>') is not a valid number". Else valid "Monthly Service Rate is valid"
+
+"Rental Deposit" - Valid if numeric and ≥ 0. If null/non-numeric/< 0: invalid "Rental Deposit ('<value>') is not a valid number". Else valid "Rental Deposit is valid"
+
+"Service Deposit" - Valid if numeric and ≥ 0. If null/non-numeric/< 0: invalid "Service Deposit ('<value>') is not a valid number". Else valid "Service Deposit is valid"
+
 Return format:
 [
   {

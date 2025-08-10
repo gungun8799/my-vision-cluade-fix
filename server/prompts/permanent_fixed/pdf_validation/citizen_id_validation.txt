@@ -1,23 +1,22 @@
-Validate citizen ID requirements and return JSON array of validation results.
+Validate citizen ID requirements and return JSON array.
 
-Validation Rules:
+**STEP 1: Customer Type**
+Check "Customer Name": business terms (Co., Ltd., Inc.) = "Corporate"; person name = "Individual"; uncertain = "—"
 
-**STEP 1: Determine Customer Type**
-"Individual or Corporate" - Analyze "Customer Name": if clearly person's name (given name + surname, no business identifiers) = "Individual"; if contains business terms like "Co.", "Ltd.", "Inc.", "Corporation" = "Corporate"; if uncertain = "—"
+**STEP 2: Validation Rules**
 
-**STEP 2: Apply Validation Based on Customer Type**
+**FOR INDIVIDUALS:**
+- "Citizen ID Number" - Must be 13 digits exactly
+- "Citizen ID expiration date" - Must be at least 6 months in future
+- "Name on Citizen ID card" - Must match "Customer Name" (ignore titles like นาย นางสาว)
+- "Address on Citizen ID card" - Valid if present, invalid if empty
+- Company fields - Mark as "—" (not applicable)
 
-**FOR INDIVIDUAL CUSTOMERS:**
-- "Citizen ID Number" - Must be exactly 13 digits (ignore whitespace, dash, separators, count only numbers). Valid if matches /^\d{13}$/
-- "Citizen ID expiration date" - Valid if expiration date is at least 6 months in future from today
-- "Name on Citizen ID card" - Verify ID card name matches "Customer Name" exactly (ignore initials like นาย นางสาว น.ส., check actual name). Match = "Yes"/valid, no match = "No"/invalid
-- "Address on Citizen ID card" - Valid if non-null, invalid if null or empty
-- "แนบหนังสือรับรองบริษัท" - Mark as "—" (not applicable for individuals)
-- "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่" - Mark as "—" (not applicable for individuals)
-
-**FOR CORPORATE CUSTOMERS:**
-
-**DOCUMENT SECTION TARGETING:** For company certificate fields (Company Registration Number, Company Certificate issued date, Names on Company Certificate), focus ONLY on the BOTTOM 2/3 of the document (counting from the bottom page upward). This is where company certificate information is typically located. Ignore content in the top 1/3 of the document to avoid confusion.
+**FOR CORPORATES:**
+- Individual fields - Mark as "—" (not applicable)
+- "Company Registration Number" - Must be 10-15 digits
+- "Company Certificate issued date" - Must be valid date
+- Company certificate validation (focus on bottom 2/3 of document)
 
 - "แนบหนังสือรับรองบริษัท" - Check if PDF includes corporate certificate document or "หนังสือรับรองความเป็นนิติบุคคล": present = "Yes"/valid, absent = "No"/invalid
 - "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่" - **ENHANCED STAMP DETECTION:** ALWAYS perform stamp detection when PDF is provided. Look carefully in the BOTTOM 2/3 of the document for ANY of these stamp indicators on the company certificate: circular/round stamps, official seals, embossed marks, red ink stamps, government department stamps, "ตรา" marks, raised impressions, or any official marking that appears to be a company/authority stamp. Even faint, partially visible, or watermarked stamps count as valid. If ANY stamp-like marking is detected: "Yes"/valid, only if completely absent: "No"/invalid

@@ -22,8 +22,6 @@ Compare these fields with flexible matching (allow contextual similarity, differ
 
 "Proposed lease expiry date" - Compare as calendar dates
 
-"Billing Frequency" - Compare billing frequency values normally
-
 Flexible comparison rules:
 - Match contextually similar values even if formatted differently
 - Examples: "March 10, 2025" vs "10/03/2025", "$1,000.00" vs "1000", "ซีพี" vs "CP"

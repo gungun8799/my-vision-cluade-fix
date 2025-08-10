@@ -2,7 +2,7 @@ Compare service charges between PDF and Web sources. Return JSON array of compar
 
 Compare these fields:
 
-"Other service charge (in the renting space)" - Compare numeric amounts
+"Other service charge (in the renting space)" - Compare numeric amounts. SPECIAL RULE: Mark as match if PDF value is 0 and Web value is NULL
 
 "Other service charge (in the renting space) Charge description" - Often "ค่าบริการพิเศษสำหรับไอเย็นและไฟฟ้า" matches "Common Area Cool Air Service Fee" - mark as match if same meaning. If charge amount is 0, field can be null
 

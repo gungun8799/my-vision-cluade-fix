@@ -1,111 +1,11 @@
-✅ PASSED] 5114_LR2505_00107 ready for processing.
-[📄 Processing] 5114_LR2505_00107
-Incoming request to /api/extract-text-only
-[🔁 OCR] Starting asyncBatchAnnotateFiles...
-[✅ OCR] asyncBatchAnnotateFiles completed
-[📤 OCR Text Ready]
-[🔄 Attempting contract classification with Lotus LLM - attempt 1/3]
-[✅ Contract classification Lotus LLM API call successful]
-[🔍 Contract Type Detected] permanent_fixed
-[📌 Using modular prompts for contract type] permanent_fixed
-[🔁 Calling /api/extract-text-sequential for OCR & Gemini]
-Incoming request to /api/extract-text
-[PromptManager] Using prompts directory: /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts
-[📁 Loading prompt file] permanent_fixed/fields/basic_info.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/basic_info.txt
-[✅ Prompt loaded] 1706 characters from permanent_fixed/fields/basic_info.txt
-[📁 Loading prompt file] permanent_fixed/fields/tenant_info.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/tenant_info.txt
-[✅ Prompt loaded] 687 characters from permanent_fixed/fields/tenant_info.txt
-[📁 Loading prompt file] permanent_fixed/fields/lease_terms.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/lease_terms.txt
-[✅ Prompt loaded] 3856 characters from permanent_fixed/fields/lease_terms.txt
-[📁 Loading prompt file] permanent_fixed/fields/service_charges.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/service_charges.txt
-[✅ Prompt loaded] 1430 characters from permanent_fixed/fields/service_charges.txt
-[📁 Loading prompt file] permanent_fixed/fields/utilities.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/utilities.txt
-[✅ Prompt loaded] 984 characters from permanent_fixed/fields/utilities.txt
-[📁 Loading prompt file] permanent_fixed/fields/signatures.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/signatures.txt
-[✅ Prompt loaded] 1105 characters from permanent_fixed/fields/signatures.txt
-[📁 Loading prompt file] permanent_fixed/fields/citizen_id.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/citizen_id.txt
-[✅ Prompt loaded] 456 characters from permanent_fixed/fields/citizen_id.txt
-[✅ Loaded modular extraction prompt for permanent_fixed]
-[🔁 OCR] Starting asyncBatchAnnotateFiles...
-[✅ OCR] asyncBatchAnnotateFiles completed
-[📥 Upload Check] Files received: 1
-[DEBUG stripThinkTags] Input length: 3459
-[DEBUG stripThinkTags] First 200 chars: ```json
-{
-  "Building Name": "บมจ. ซีพี เอ็กซ์ตร้า บางปะกง",
-  "Building ID": "5114",
-  "อยู่กองทรัสต์หรือไม่": "No",
-  "แบบสัญญากองทรัสต์": "Valid",
-  "Contract Number": "5114_LR2505_00107",
-  "Brand
-[DEBUG stripThinkTags] Last 200 chars:  Citizen ID card": "88/78 หมู่ที่ 1 ตำบลราชาเทวะ อำเภอบางพลี จังหวัดสมุทรปราการ",
-  "Citizen ID Number": "1200500040475",
-  "Citizen ID expiration date": "7 ม.ค 2560",
-  "Workflow status": null
-}
-```
-
-[DEBUG stripThinkTags] Output length: 3458
-[DEBUG stripThinkTags] Output preview: ```json
-{
-  "Building Name": "บมจ. ซีพี เอ็กซ์ตร้า บางปะกง",
-  "Building ID": "5114",
-  "อยู่กองทรัสต์หรือไม่": "No",
-  "แบบสัญญากองทรัสต์": "Valid",
-  "Contract Number": "5114_LR2505_00107",
-  "Brand
-[✅ PDF extraction Gemini API call successful]
-[📤 Firebase] Document saved as ID: 5114_LR2505_00107
-[✅ Backend extract complete using legacy method]
-[🔖 Extracted Contract Number] 5114_LR2505_00107
-[🔐 Ensuring Simplicity login before auto-scrape for 5114_LR2505_00107]
-[LOGIN] Simplicity login successful for wisarut.gunjarueg@lotuss.com
-[✅ Auto-login to Simplicity successful]
-[🔐 Auto-scrape for 5114_LR2505_00107]
-[🔄 Using legacy web scraping]
-[Simplicity] Incoming request to /api/scrape-url
-[Request Body] {
-  systemType: 'simplicity',
-  contractType: 'permanent_fixed',
-  contractNumber: '5114_LR2505_00107'
-}
-[Simplicity] Navigating Lease > Lease Renewal...
-✅ Lease Renewal clicked
-[Simplicity] Searching for contract number: 5114_LR2505_00107
-[Simplicity] Typing and submitting contract number...
-[Simplicity] Clicking search <a> button...
-[Simplicity] Clicking view icon...
-[Simplicity] Popup search attempt 1/15, looking for URL containing: leaserenewal/edit.aspx
-[Simplicity] Current pages (2 total): [
-  'about:blank',
-  'https://mall-management.lotuss.com/Simplicity/apptop.aspx'
+'https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5e2tRmOPI01AavuWXYxVkU4rnRub44mG5AG6MsSv4hfusX4G%2bZQuKl8M%2bGM8rTJPya5FuVErqNyKcqwF14COLCUR8oyhaRsJVlAMxMdJceKg8v%2bOIDUi0S0cLyN7auR1AaRkgRK%2fQn0JqzdDxzhyTAuf7S4wxQS4kNvsJie%2fpkjKZJ4G1lGqKJvg%3d%3d&TYPE=%5eoalhGVApmjtmQjYsPU6%2bmdi%2bNpIFWiOK2sCSoz4sNmBlmB06z0yzIQxgApartb5kgF5SxgCzzjg6sM6GWe76u2%2b6c1fcuXTSJ0vUEm1OxTQ%3d&SEARCH=1'
 ]
-[Simplicity] ⏳ Popup not found yet, waiting 2 seconds...
-[Simplicity] Popup search attempt 2/15, looking for URL containing: leaserenewal/edit.aspx
-[Simplicity] Current pages (2 total): [
-  'about:blank',
-  'https://mall-management.lotuss.com/Simplicity/apptop.aspx'
-]
-[Simplicity] ⏳ Popup not found yet, waiting 2 seconds...
-[Simplicity] Popup search attempt 3/15, looking for URL containing: leaserenewal/edit.aspx
-[Simplicity] Current pages (3 total): [
-  'about:blank',
-  'https://mall-management.lotuss.com/Simplicity/apptop.aspx',
-  'https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5ea8%2fUzSzXzSchmZj8LgPr9SbefQv56kuRZ%2bCF40PIfEWcSiPS0cL6%2bXGPQn7L5mtAJVHIiNv8%2bfLZkS%2fFTk0CS6K24sbUOGWXnBmaRMfBMPueSjfnBD2nITi3fHSTTWsIEH%2bZHHI60w2ZQoYfg63pAou59eOzu%2bADogPwsP7ri9cQVGKH%2f8FnYQ%3d%3d&TYPE=%5emRrvX3I5%2fno9F5%2b9LuZOyaZXB4F1XSiqVAAWeSyxfvpHcUvwid7aCxYj8vsHfG3Wuz797kCt5k27ZcKvPrzVQG%2bSMqUAkWvQNkAkfjJBFz0%3d&SEARCH=1'
-]
-[Simplicity] ✅ Popup found: https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5ea8%2fUzSzXzSchmZj8LgPr9SbefQv56kuRZ%2bCF40PIfEWcSiPS0cL6%2bXGPQn7L5mtAJVHIiNv8%2bfLZkS%2fFTk0CS6K24sbUOGWXnBmaRMfBMPueSjfnBD2nITi3fHSTTWsIEH%2bZHHI60w2ZQoYfg63pAou59eOzu%2bADogPwsP7ri9cQVGKH%2f8FnYQ%3d%3d&TYPE=%5emRrvX3I5%2fno9F5%2b9LuZOyaZXB4F1XSiqVAAWeSyxfvpHcUvwid7aCxYj8vsHfG3Wuz797kCt5k27ZcKvPrzVQG%2bSMqUAkWvQNkAkfjJBFz0%3d&SEARCH=1
+[Simplicity] ✅ Popup found: https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5e2tRmOPI01AavuWXYxVkU4rnRub44mG5AG6MsSv4hfusX4G%2bZQuKl8M%2bGM8rTJPya5FuVErqNyKcqwF14COLCUR8oyhaRsJVlAMxMdJceKg8v%2bOIDUi0S0cLyN7auR1AaRkgRK%2fQn0JqzdDxzhyTAuf7S4wxQS4kNvsJie%2fpkjKZJ4G1lGqKJvg%3d%3d&TYPE=%5eoalhGVApmjtmQjYsPU6%2bmdi%2bNpIFWiOK2sCSoz4sNmBlmB06z0yzIQxgApartb5kgF5SxgCzzjg6sM6GWe76u2%2b6c1fcuXTSJ0vUEm1OxTQ%3d&SEARCH=1
 [Simplicity] Bringing popup to front...
 [Simplicity] Waiting for popup content to load...
 [Simplicity] Waiting for popup navigation to complete...
 [⚠️ popup.waitForNavigation] Error or already loaded: Navigation timeout of 10000 ms exceeded
-[Simplicity] Final popup URL with params: https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5ea8%2fUzSzXzSchmZj8LgPr9SbefQv56kuRZ%2bCF40PIfEWcSiPS0cL6%2bXGPQn7L5mtAJVHIiNv8%2bfLZkS%2fFTk0CS6K24sbUOGWXnBmaRMfBMPueSjfnBD2nITi3fHSTTWsIEH%2bZHHI60w2ZQoYfg63pAou59eOzu%2bADogPwsP7ri9cQVGKH%2f8FnYQ%3d%3d&TYPE=%5emRrvX3I5%2fno9F5%2b9LuZOyaZXB4F1XSiqVAAWeSyxfvpHcUvwid7aCxYj8vsHfG3Wuz797kCt5k27ZcKvPrzVQG%2bSMqUAkWvQNkAkfjJBFz0%3d&SEARCH=1
+[Simplicity] Final popup URL with params: https://mall-management.lotuss.com/Simplicity/modules/lease/leaserenewal/edit.aspx?ID=%5e2tRmOPI01AavuWXYxVkU4rnRub44mG5AG6MsSv4hfusX4G%2bZQuKl8M%2bGM8rTJPya5FuVErqNyKcqwF14COLCUR8oyhaRsJVlAMxMdJceKg8v%2bOIDUi0S0cLyN7auR1AaRkgRK%2fQn0JqzdDxzhyTAuf7S4wxQS4kNvsJie%2fpkjKZJ4G1lGqKJvg%3d%3d&TYPE=%5eoalhGVApmjtmQjYsPU6%2bmdi%2bNpIFWiOK2sCSoz4sNmBlmB06z0yzIQxgApartb5kgF5SxgCzzjg6sM6GWe76u2%2b6c1fcuXTSJ0vUEm1OxTQ%3d&SEARCH=1
 [Simplicity] Expanding all collapsible sections...
 [Simplicity] Waiting 10 seconds for page to fully load...
 [Simplicity] Starting to expand collapsible sections...
@@ -139,12 +39,12 @@ Incoming request to /api/extract-text
 [Simplicity] Finished expanding all collapsible sections
 [Simplicity] Scraped content:  PREVIOUS  NEXT  SAVE
 CREATE INVOICE CREATE CREDIT NOTE
- AREIT_LANDLEASE (VIEWED 0 TIME(S)) AREIT_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 0 TIME(S)) ATMLEASESERVICE (VIEWED 0 TIME(S)) LEASEANDSERVICE_SUBLEASE (VIEWED 0 TIME(S)) LOTUS_LANDLEASE (VIEWED 0 TIME(S)) LOTUS_LEASEANDSERVICE_MKGROUP (VIEWED 0 TIME(S)) LOTUS_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 25 TIME(S)) LOTUS_STANDARD_SHORTFORM_RENTSERVICE (VIEWED 2 TIME(S)) SIGNBOARD (VIEWED 0 TIME(S)) STANDARDLEASESER_CRGCRC (VIEWED 0 TIME(S))	VIEW DOCUMENT PRINT LOG
+ AREIT_LANDLEASE (VIEWED 0 TIME(S)) AREIT_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 0 TIME(S)) ATMLEASESERVICE (VIEWED 0 TIME(S)) LEASEANDSERVICE_SUBLEASE (VIEWED 0 TIME(S)) LOTUS_LANDLEASE (VIEWED 0 TIME(S)) LOTUS_LEASEANDSERVICE_MKGROUP (VIEWED 0 TIME(S)) LOTUS_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 29 TIME(S)) LOTUS_STANDARD_SHORTFORM_RENTSERVICE (VIEWED 6 TIME(S)) SIGNBOARD (VIEWED 0 TIME(S)) STANDARDLEASESER_CRGCRC (VIEWED 0 TIME(S))	VIEW DOCUMENT PRINT LOG
 
 
  PREVIOUS  NEXT  SAVE
 CREATE INVOICE CREATE CREDIT NOTE
- AREIT_LANDLEASE (VIEWED 0 TIME(S)) AREIT_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 0 TIME(S)) ATMLEASESERVICE (VIEWED 0 TIME(S)) LEASEANDSERVICE_SUBLEASE (VIEWED 0 TIME(S)) LOTUS_LANDLEASE (VIEWED 0 TIME(S)) LOTUS_LEASEANDSERVICE_MKGROUP (VIEWED 0 TIME(S)) LOTUS_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 25 TIME(S)) LOTUS_STANDARD_SHORTFORM_RENTSERVICE (VIEWED 2 TIME(S)) SIGNBOARD (VIEWED 0 TIME(S)) STANDARDLEASESER_CRGCRC (VIEWED 0 TIME(S))	VIEW DOCUMENT PRINT LOG
+ AREIT_LANDLEASE (VIEWED 0 TIME(S)) AREIT_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 0 TIME(S)) ATMLEASESERVICE (VIEWED 0 TIME(S)) LEASEANDSERVICE_SUBLEASE (VIEWED 0 TIME(S)) LOTUS_LANDLEASE (VIEWED 0 TIME(S)) LOTUS_LEASEANDSERVICE_MKGROUP (VIEWED 0 TIME(S)) LOTUS_STANDARD_LEASEANDSERVICE_FIXED&GP (VIEWED 29 TIME(S)) LOTUS_STANDARD_SHORTFORM_RENTSERVICE (VIEWED 6 TIME(S)) SIGNBOARD (VIEWED 0 TIME(S)) STANDARDLEASESER_CRGCRC (VIEWED 0 TIME(S))	VIEW DOCUMENT PRINT LOG
 
 
 
@@ -250,7 +150,7 @@ No items
  	 	 	 	 	 
 Renewal Terms OPTION TO RENEW?:		
 Has Early Terminate/ Exit Clause HAS EARLY TERMINATE/ EXIT CLAUSE:		
-FIRST CREATED BY:		Chanidapa Martbangong on 20-May-2025 10:58:06 AM (81 days ago) LAST MODIFIED BY:		หฤทัย ศรีพัษยศ on 17-Jul-2025 04:28:29 PM (23 days ago) ASSIGNED USER(S):		Chanidapa Martbangong ASSIGNED POSITION(S):		Assistant Leasing Manager (ALL) (สุนัฏฏา แก้วดา, สิริยาพร พูลสิทธิ์, ศิริลักษณ์ สวัสดิ์ผล, กวิสรา หนูศรี, กัญญาณัฐ พิมพกรรณ์, ปัณณรัตน์ วัฒนศักดิ์วรากุล, Sitthisak Thimahan, Apichat Tiwawong, Sumintra Meesutha, Sukanya Budkum, Anongnad Kaewda, Phatcharin Somlee, Suthiya Chansri, Chanidapa Martbangong, Supap Singpat, Netwongluk Pobuth, Chitsanucha Sornwichian, Nattamon Rattanatrang, Thunhatai Chunngew, Saisuda Phimphijan, กัญญาณัฐ คำเพชร, Kittiya Homhun, พัตรพิมล ทรงเลิศศรัณย์, Praema Jankhonkhan, Pannipa Mothina, Kanitta Krobtaku, Kodchakorn Phokhamphai, Thanaporn Chantate, ซามีลา จัมบา, Nichapat Homwan, Thansinee Laedukham, Jarupa Mahabunthu, Sataya Tangsuchon, Pattanun Panudom, Nannapas Niemprasert, Nattakorn Yamebubpha, Kansuda Sawatphadungkit, Onanong Namjai, Suchada Rasri, Jerina Thipwong, Kanyapat Thumthong, Niramith Thimahan)
+FIRST CREATED BY:		Chanidapa Martbangong on 20-May-2025 10:58:06 AM (82 days ago) LAST MODIFIED BY:		หฤทัย ศรีพัษยศ on 17-Jul-2025 04:28:29 PM (23 days ago) ASSIGNED USER(S):		Chanidapa Martbangong ASSIGNED POSITION(S):		Assistant Leasing Manager (ALL) (สุนัฏฏา แก้วดา, สิริยาพร พูลสิทธิ์, ศิริลักษณ์ สวัสดิ์ผล, กวิสรา หนูศรี, กัญญาณัฐ พิมพกรรณ์, ปัณณรัตน์ วัฒนศักดิ์วรากุล, Sitthisak Thimahan, Apichat Tiwawong, Sumintra Meesutha, Sukanya Budkum, Anongnad Kaewda, Phatcharin Somlee, Suthiya Chansri, Chanidapa Martbangong, Supap Singpat, Netwongluk Pobuth, Chitsanucha Sornwichian, Nattamon Rattanatrang, Thunhatai Chunngew, Saisuda Phimphijan, กัญญาณัฐ คำเพชร, Kittiya Homhun, พัตรพิมล ทรงเลิศศรัณย์, Praema Jankhonkhan, Pannipa Mothina, Kanitta Krobtaku, Kodchakorn Phokhamphai, Thanaporn Chantate, ซามีลา จัมบา, Nichapat Homwan, Thansinee Laedukham, Jarupa Mahabunthu, Sataya Tangsuchon, Pattanun Panudom, Nannapas Niemprasert, Nattakorn Yamebubpha, Kansuda Sawatphadungkit, Onanong Namjai, Suchada Rasri, Jerina Thipwong, Kanyapat Thumthong, Niramith Thimahan)
 Leasing Manager (ALL) (เมธาพร สายเพชร, ชุติมันต์ แสงอรุณ, อุรัสยา จุ้ยกระยาง, พรชนก ศรีขำ, สุนัฏฏา แก้วดา, สิริยาพร พูลสิทธิ์, ศิริลักษณ์ สวัสดิ์ผล, กวิสรา หนูศรี, กัญญาณัฐ พิมพกรรณ์, สุชิรา เกษดี, ปวรวัฒน์ กิจเดช, เกียรติยศ วิสิทธิวงษ์, วรินทร วันเพ็ญ, นาฏยา นวลแดงแสงสุรีย์, อัจฉริยา ใสแจ่ม, อิทธิพันธ์ ว่องสาทรกิจ, กิตติธัช ทะสะระ, อรสา สุขสุพล, พรชัย ตรีศกประพฤทธิ์, อรุณศรี ธีระกุลพิศุทธิ์, ชุติมณฑน์ บุณโยดม, สุนันท์ สนธิวงศ์, ณภัสฉัตร์ ปีวราธนากิตติ์, จิรัฏฐิติกาล พุทธเจริญ, วลัยลักษณ์ ศิริเลิศสมบัติ, นิธินันท์ อุดมจรรยาวัฒน์, วริยา ประภานนท์, สุรีมาศ รักแคว้น, สาธิต พันธ์ศรี, วารุณี เมฆเกิดชู, สมศักดิ์ จารุจารีต, เกรียงไกร ขำปรางค์, ปัณณรัตน์ วัฒนศักดิ์วรากุล, ศิรินทิพย์ มะระประเสริฐศักดิ์, รภากร เมืองครุฑ, นาฏยา จินดารักษ์, Sitthisak Thimahan, Apichat Tiwawong, Sumintra Meesutha, สมคิด ศรีสุขภิญโญ, รินรดา คงเพชร, Sukanya Budkum, กัลยา ชื่นบาน, พิมพ์พิมล ปัญญาพูนตระกูล, ณิชาพัฏฐ์ ประเสริฐศรี, Phatcharin Somlee, ชยพล ลิ้มเทียมรัตน์, สมัชชา กันทะวงศ์, ณัฐพล ยิ่งอารีย์, จุฬาลักษณ์ วิริยะ, นุชสรา อินทรกำแหง, สิรินรี เหล็กเพชร, ภรณ์ทิพย์ วณาพรรณ์, นพพร ธีรฐิตยางกูร, ชรินทร์ทิพย์ แตงวิเชียร, นิรชา ก้องดำรงค์กุล, พัทธนันท์ มีสุข เปโตรวิช, พรพิรุณ อุ่นบุญเรือง, กานต์ธิดา หนุนภักดี, วิมลมาศ บัวเพชร, นิศารัตน์ นรินทร์ศิลป์, รุ้งวารีย์ ชวาลวราเกียรติ, ณพวิช เจนวากรวงศ์, ณัฐภัทร สมิทธิลีลา)
 Leasing Manager (บริษัท เอก-ชัยฯ บางปะกง (5114)) (No one)
 Leasing Manager (Ek-Chai) (No one)
@@ -267,7 +167,7 @@ Leasing Manager (Ek-Chai) (No one)
 [✅ Prompt loaded] 3856 characters from permanent_fixed/fields/lease_terms.txt
 [📁 Loading prompt file] permanent_fixed/fields/service_charges.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/service_charges.txt
-[✅ Prompt loaded] 1430 characters from permanent_fixed/fields/service_charges.txt
+[✅ Prompt loaded] 2293 characters from permanent_fixed/fields/service_charges.txt
 [📁 Loading prompt file] permanent_fixed/fields/utilities.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/fields/utilities.txt
 [✅ Prompt loaded] 984 characters from permanent_fixed/fields/utilities.txt
@@ -280,13 +180,13 @@ Leasing Manager (Ek-Chai) (No one)
 [✅ Loaded modular extraction prompt for permanent_fixed]
 [Simplicity] Sending content to Lotus LLM...
 [🔄 Lotus LLM web scraping attempt 1/3]
-[DEBUG stripThinkTags] Input length: 3317
+[DEBUG stripThinkTags] Input length: 3285
 [DEBUG stripThinkTags] First 200 chars: ```json
 {
   "Building Name": "บมจ. ซีพี แอ็กซ์ตร้า บางปะกง",
   "Building ID": "5114",
   "อยู่กองทรัสต์หรือไม่": "No",
-  "แบบสัญญากองทรัสต์": null,
+  "แบบสัญญากองทรัสต์": "No",
   "Contract Number": "5114/LR2505/00107",
   "Brand Na
 [DEBUG stripThinkTags] Last 200 chars: signed person)": null,
@@ -297,20 +197,20 @@ Leasing Manager (Ek-Chai) (No one)
   "Workflow status": "Accepted"
 }
 ```
-[DEBUG stripThinkTags] Output length: 3317
+[DEBUG stripThinkTags] Output length: 3285
 [DEBUG stripThinkTags] Output preview: ```json
 {
   "Building Name": "บมจ. ซีพี แอ็กซ์ตร้า บางปะกง",
   "Building ID": "5114",
   "อยู่กองทรัสต์หรือไม่": "No",
-  "แบบสัญญากองทรัสต์": null,
+  "แบบสัญญากองทรัสต์": "No",
   "Contract Number": "5114/LR2505/00107",
   "Brand Na
 [✅ Lotus LLM web scraping successful]
 [📄 Scrape Contract ID] 5114_LR2505_00107 [Lease Type] Permanent Fixed [Workflow Status] Accepted
 [🔥 Firebase] Document saved to 'compare_result': 5114_LR2505_00107
 [✅ Web scrape complete]
-[🧪 Cleaned Web Gemini JSON Preview] {  "Building Name": "บมจ. ซีพี แอ็กซ์ตร้า บางปะกง",  "Building ID": "5114",  "อยู่กองทรัสต์หรือไม่": "No",  "แบบสัญญากองทรัสต์": null,  "Contract Number": "5114/LR2505/00107",  "Brand Name": "มิตซู บีเอ็นที",  "Property Type": "Hypermarket",  "Customer Name": "บริษัท มิตซู บีเอ็นที จำกัด",  "Custome
+[🧪 Cleaned Web Gemini JSON Preview] {  "Building Name": "บมจ. ซีพี แอ็กซ์ตร้า บางปะกง",  "Building ID": "5114",  "อยู่กองทรัสต์หรือไม่": "No",  "แบบสัญญากองทรัสต์": "No",  "Contract Number": "5114/LR2505/00107",  "Brand Name": "มิตซู บีเอ็นที",  "Property Type": "Hypermarket",  "Customer Name": "บริษัท มิตซู บีเอ็นที จำกัด",  "Custome
 [🔄 Using legacy comparison]
 [👁️ HIT /api/gemini-compare]
 [🔍 Contract type resolved] RequestType: permanent_fixed, PromptKey: LOI_permanent_fixed_fields, Final: permanent_fixed
@@ -320,10 +220,10 @@ Leasing Manager (Ek-Chai) (No one)
 [🔍 Creating comparison prompt] Category: basic, ContractType: permanent_fixed, ContractNumber: 5114_LR2505_00107
 [📁 Loading prompt file] permanent_fixed/compare/basic_fields.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/compare/basic_fields.txt
-[✅ Prompt loaded] 1505 characters from permanent_fixed/compare/basic_fields.txt
+[✅ Prompt loaded] 1440 characters from permanent_fixed/compare/basic_fields.txt
 [📋 Contract Config] Type: permanent_fixed, NumberType: LR, IsLR: true, ContractNumber: 5114_LR2505_00107
 [📋 Added LR-specific rules for LR contract: 5114_LR2505_00107]
-[✅ Comparison prompt created] 1943 characters for basic
+[✅ Comparison prompt created] 1878 characters for basic
 [🔍 BASIC CATEGORY PROMPT PREVIEW]:
 Contract Number in prompt: 5114_LR2505_00107
 Prompt preview (first 500 chars): 
@@ -341,68 +241,46 @@ Compare these fields with flexible matching (allow contextual similarity, differ
 "Building Name" - If field "อยู่กองทรัสต์หรือไม่" is "Yes...
 [✅ LR CONTRACT RULE found in basic category prompt]
 [✅ Category basic processed successfully]
-[🔍 basic raw response length: 1871
-[🔍 basic response preview: [
-  {
-    "field": "อยู่กองทรัสต์หรือไม่",
-    "pdf": "No",
-    "web": "No",
+[🔍 basic raw response length: 11624
+[🔍 basic response preview: 
+<think>Let me analyze the comparison between PDF and Web sources for this PERMANENT FIXED contract with LR contract number type. I'll compare the fields as specified, applying the flexible matching rules and the special LR contract rules.
+
+First, let me identify which fields need to be compared based on the instructions:
+
+1. "อยู่กองทรัสต์หรือไม่" - REIT status comparison (must match exactly)
+2. "Building Name" - If REIT status is "Yes", validate as valid (contains word "ซีพี")
+3. "Brand Name" ...
+[DEBUG stripThinkTags] Input length: 11624
+[DEBUG stripThinkTags] First 200 chars: 
+<think>Let me analyze the comparison between PDF and Web sources for this PERMANENT FIXED contract with LR contract number type. I'll compare the fields as specified, applying the flexible matching r
+[DEBUG stripThinkTags] Last 200 chars: pdf": "PG047",
+    "web": "PG047",
     "match": true,
-    "reason": "Exact match"
+    "reason": "Both values are identical and match the PXXXX format"
   },
   {
-    "field": "Building Name",
-    "pdf": "บมจ. ซีพี เอ็กซ์ตร้า บางปะกง",
-    "web": "บมจ. ซีพี แอ็กซ์ตร้า บางปะกง",
-    "match": true,
-    "reason": "Contextually similar, only difference is spelling of 'อ็กซ์ตร้า'"
-  },
-  {
-    "field": "Brand Name",
-    "pdf": "มิตซู บีเอ็นที",
-    "web": "มิตซู บีเอ็นที",
-    "match": true,
-    "reason": "Exact match"
-  },
-  {
- ...
-[DEBUG stripThinkTags] Input length: 1871
-[DEBUG stripThinkTags] First 200 chars: [
-  {
-    "field": "อยู่กองทรัสต์หรือไม่",
-    "pdf": "No",
-    "web": "No",
-    "match": true,
-    "reason": "Exact match"
-  },
-  {
-    "field": "Building Name",
-    "pdf": "บมจ. ซีพี เอ็กซ์ตร้า บางป
-[DEBUG stripThinkTags] Last 200 chars: une 30, 2027), different formats"
-  },
-  {
-    "field": "Billing Frequency",
-    "pdf": null,
-    "web": "Monthly",
-    "match": false,
-    "reason": "PDF value is missing while web has a value"
-  }
-]
-[DEBUG stripThinkTags] Output length: 1871
+    "field": "Space (NLA)",
+    "pdf": "98.00",
+    "web": "98.00",
+
+[DEBUG stripThinkTags] Found unclosed think tag
+[DEBUG stripThinkTags] Found JSON content, preserving it
+[DEBUG stripThinkTags] Output length: 5661
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "อยู่กองทรัสต์หรือไม่",
     "pdf": "No",
     "web": "No",
     "match": true,
-    "reason": "Exact match"
+    "reason": "Both values are 'No', exact match"
   },
   {
     "field": "Building Name",
-    "pdf": "บมจ. ซีพี เอ็กซ์ตร้า บางป
-[🧹 basic after cleaning length: 1871
-[✅ basic parsed successfully - 11 fields]
-[📊 basic fields: อยู่กองทรัสต์หรือไม่, Building Name, Brand Name, Customer Name, Customer Address, Unit ID, Space (NLA), Tenant Type, Proposed lease commencement date, Proposed lease expiry date, Billing Frequency
+    "pdf": "บมจ
+[🧹 basic after cleaning length: 5661
+[🔧 basic] Trimming extra content after JSON array
+[✅ basic parsed successfully - 10 fields]
+[📊 basic fields: อยู่กองทรัสต์หรือไม่, Building Name, Brand Name, Customer Name, Customer Address, Unit ID, Space (NLA), Tenant Type, Proposed lease commencement date, Proposed lease expiry date
 [📊 Processing category: lease_terms]
 [🔍 Creating comparison prompt] Category: lease_terms, ContractType: permanent_fixed, ContractNumber: 5114_LR2505_00107
 [📁 Loading prompt file] permanent_fixed/compare/lease_terms.txt
@@ -411,33 +289,35 @@ Compare these fields with flexible matching (allow contextual similarity, differ
 [📋 Contract Config] Type: permanent_fixed, NumberType: LR, IsLR: true, ContractNumber: 5114_LR2505_00107
 [✅ Comparison prompt created] 4430 characters for lease_terms
 [✅ Category lease_terms processed successfully]
-[🔍 lease_terms raw response length: 14704
+[🔍 lease_terms raw response length: 13023
 [🔍 lease_terms response preview: 
 <think>Let me analyze the comparison between the PDF and Web sources for the contract. I'll go through each field systematically and determine if they match based on the provided rules.
 
-First, let me note the contract type and number:
-- Contract Type: PERMANENT FIXED
+First, let me understand the key information:
 - Contract Number Type: LR
-- Contract Number: 5114_LR2505_00107
+- Contract Number: 5114_LR2505_00107 (PDF) vs 5114/LR2505/00107 (Web)
 
 Now, let's compare each field:
 
-1. "Lease Type"
+1. "Lease Type" - Check "4. ค่าเช่าและบริการ" for payment condition "Permanent Fixed" vs other
    - PDF: "Permanent Fixed"
-   - Web: "Permanent Fixed"
-   - Match: true
-   - Reason: Both sources indicate "Permanen...
-[DEBUG stripThinkTags] Input length: 14704
+   - Web: "Pe...
+[DEBUG stripThinkTags] Input length: 13023
 [DEBUG stripThinkTags] First 200 chars: 
 <think>Let me analyze the comparison between the PDF and Web sources for the contract. I'll go through each field systematically and determine if they match based on the provided rules.
 
 First, let m
-[DEBUG stripThinkTags] Last 200 chars: once more to ensure it's properly formatted and contains all the required fields. The JSON array looks good and includes all the required fields with proper match values and reasons.
-
-Actually, I need
+[DEBUG stripThinkTags] Last 200 chars: -Jun-2027, matches Web date exactly."
+  },
+  {
+    "field": "Year 2 : Charge Type",
+    "pdf": "Fixed Rate",
+    "web": "Fixed rate",
+    "match": true,
+    "reason": "Both sources indicate fixed rate
 [DEBUG stripThinkTags] Found unclosed think tag
 [DEBUG stripThinkTags] Found JSON content, preserving it
-[DEBUG stripThinkTags] Output length: 3991
+[DEBUG stripThinkTags] Output length: 3936
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Lease Type",
@@ -448,67 +328,52 @@ Actually, I need
   },
   {
     
-[🧹 lease_terms after cleaning length: 3991
+[🧹 lease_terms after cleaning length: 3936
 [✅ lease_terms parsed successfully - 20 fields]
 [📊 lease_terms fields: Lease Type, Billing Frequency, Monthly charge, Year 1 : Contract Start date, Year 1 : Contract End date, Year 1 : Charge Type, Year 1 : Monthly Amount of rent, Year 1 : Monthly Amount of service, Year 2 : Contract Start date, Year 2 : Contract End date, Year 2 : Charge Type, Year 2 : Monthly Amount of rent, Year 2 : Monthly Amount of service, Year 3 : Contract Start date, Year 3 : Contract End date, Year 3 : Charge Type, Year 3 : Monthly Amount of rent, Year 3 : Monthly Amount of service, Total Rent Deposits, Total Service Deposits
 [📊 Processing category: service_charges]
 [🔍 Creating comparison prompt] Category: service_charges, ContractType: permanent_fixed, ContractNumber: 5114_LR2505_00107
 [📁 Loading prompt file] permanent_fixed/compare/service_charges.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/compare/service_charges.txt
-[✅ Prompt loaded] 1514 characters from permanent_fixed/compare/service_charges.txt
+[✅ Prompt loaded] 1583 characters from permanent_fixed/compare/service_charges.txt
 [📋 Contract Config] Type: permanent_fixed, NumberType: LR, IsLR: true, ContractNumber: 5114_LR2505_00107
-[✅ Comparison prompt created] 1637 characters for service_charges
+[✅ Comparison prompt created] 1706 characters for service_charges
 [✅ Category service_charges processed successfully]
-[🔍 service_charges raw response length: 1772
-[🔍 service_charges response preview: [
-  {
-    "field": "Other service charge (in the renting space)",
-    "pdf": "0.00",
-    "web": null,
-    "match": false,
-    "reason": "Numeric amounts don't match (0.00 vs null)"
-  },
-  {
-    "field": "Other service charge (in the renting space) Charge description",
-    "pdf": null,
-    "web": null,
-    "match": true,
-    "reason": "Both fields are null, which is valid when charge amount is 0"
-  },
-  {
-    "field": "Other service charge (in the renting space) start date",
-    "pdf": null,
-    ...
-[DEBUG stripThinkTags] Input length: 1772
-[DEBUG stripThinkTags] First 200 chars: [
-  {
-    "field": "Other service charge (in the renting space)",
-    "pdf": "0.00",
-    "web": null,
-    "match": false,
-    "reason": "Numeric amounts don't match (0.00 vs null)"
-  },
-  {
-    "field
-[DEBUG stripThinkTags] Last 200 chars: ge (Common area) end date",
-    "pdf": "30 มิถุนายน 2570",
-    "web": "30-Jun-2027",
-    "match": true,
-    "reason": "Both represent the same date (June 30, 2027) in different calendar systems"
-  }
-]
-[DEBUG stripThinkTags] Output length: 1772
+[🔍 service_charges raw response length: 13809
+[🔍 service_charges response preview: 
+<think>Let me analyze the comparison between PDF and Web sources for the service charges. I'll go through each field one by one and determine if they match based on the rules provided.
+
+1. "Other service charge (in the renting space)"
+   - PDF: "0.00"
+   - Web: null
+   - According to the SPECIAL RULE: Mark as match if PDF value is 0 and Web value is NULL
+   - Match: true
+   - Reason: PDF value is 0 and Web value is NULL, which matches the special rule
+
+2. "Other service charge (in the renting s...
+[DEBUG stripThinkTags] Input length: 13809
+[DEBUG stripThinkTags] First 200 chars: 
+<think>Let me analyze the comparison between PDF and Web sources for the service charges. I'll go through each field one by one and determine if they match based on the rules provided.
+
+1. "Other ser
+[DEBUG stripThinkTags] Last 200 chars: ": PDF is "30 มิถุนายน 2570" (June 30, 2027), Web is "30-Jun-2027" (June 30, 2027). These represent the same date, just in different formats, so this is a match.
+
+So the final JSON array is:
+
+```json
+
+[DEBUG stripThinkTags] Found unclosed think tag
+[DEBUG stripThinkTags] Found JSON content, preserving it
+[DEBUG stripThinkTags] Output length: 8859
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Other service charge (in the renting space)",
     "pdf": "0.00",
     "web": null,
-    "match": false,
-    "reason": "Numeric amounts don't match (0.00 vs null)"
-  },
-  {
-    "field
-[🧹 service_charges after cleaning length: 1772
+    "match": true,
+    "reason": "PDF value is 0 and Web value is NULL, which matches the special 
+[🧹 service_charges after cleaning length: 8859
+[🔧 service_charges] Trimming extra content after JSON array
 [✅ service_charges parsed successfully - 8 fields]
 [📊 service_charges fields: Other service charge (in the renting space), Other service charge (in the renting space) Charge description, Other service charge (in the renting space) start date, Other service charge (in the renting space) end date, Other service charge (Common area), Other service charge (Common area) Charge description, Other service charge (Common area) start date, Other service charge (Common area) end date
 [📊 Processing category: utilities]
@@ -519,66 +384,70 @@ Actually, I need
 [📋 Contract Config] Type: permanent_fixed, NumberType: LR, IsLR: true, ContractNumber: 5114_LR2505_00107
 [✅ Comparison prompt created] 1431 characters for utilities
 [✅ Category utilities processed successfully]
-[🔍 utilities raw response length: 647
+[🔍 utilities raw response length: 583
 [🔍 utilities response preview: [
   {
     "field": "Include Utility",
     "pdf": "No",
     "web": "No",
     "match": true,
-    "reason": "Both values are 'No', so they match."
+    "reason": "Both values are 'No'"
   },
   {
     "field": "Utilities charge (water)",
     "pdf": "0.00",
     "web": "0.00",
     "match": true,
-    "reason": "Both values are '0.00', so they match."
+    "reason": "Both values are '0.00'"
   },
   {
     "field": "Utilities charge (Electricity)",
     "pdf": "0.00",
     "web": "0.00",
     "match": true,
-    "reason": "Both values are '0.00', so they match."
+    "reason": "Both values are '0.00'"
   },
   {
-    "field": "Uti...
-[DEBUG stripThinkTags] Input length: 647
+    "field": "Utilities charge (cooking gas)",
+    "pdf": "0.00",...
+[DEBUG stripThinkTags] Input length: 583
 [DEBUG stripThinkTags] First 200 chars: [
   {
     "field": "Include Utility",
     "pdf": "No",
     "web": "No",
     "match": true,
-    "reason": "Both values are 'No', so they match."
+    "reason": "Both values are 'No'"
   },
   {
     "field": "Utilities charge (water)",
-    "p
-[DEBUG stripThinkTags] Last 200 chars: re '0.00', so they match."
+    "pdf": "0.00",
+   
+[DEBUG stripThinkTags] Last 200 chars: ue,
+    "reason": "Both values are '0.00'"
   },
   {
     "field": "Utilities charge (cooking gas)",
     "pdf": "0.00",
     "web": "0.00",
     "match": true,
-    "reason": "Both values are '0.00', so they match."
+    "reason": "Both values are '0.00'"
   }
 ]
-[DEBUG stripThinkTags] Output length: 647
+[DEBUG stripThinkTags] Output length: 583
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Include Utility",
     "pdf": "No",
     "web": "No",
     "match": true,
-    "reason": "Both values are 'No', so they match."
+    "reason": "Both values are 'No'"
   },
   {
     "field": "Utilities charge (water)",
-    "p
-[🧹 utilities after cleaning length: 647
+    "pdf": "0.00",
+   
+[🧹 utilities after cleaning length: 583
 [✅ utilities parsed successfully - 4 fields]
 [📊 utilities fields: Include Utility, Utilities charge (water), Utilities charge (Electricity), Utilities charge (cooking gas)
 [📊 Processing category: tax_deposits]
@@ -589,11 +458,11 @@ Actually, I need
 [📋 Contract Config] Type: permanent_fixed, NumberType: LR, IsLR: true, ContractNumber: 5114_LR2505_00107
 [✅ Comparison prompt created] 995 characters for tax_deposits
 [✅ Category tax_deposits processed successfully]
-[🔍 tax_deposits raw response length: 14403
+[🔍 tax_deposits raw response length: 14172
 [🔍 tax_deposits response preview: 
-<think>Let me analyze the comparison between PDF and Web sources for the two fields mentioned: "Lease property tax" and "Deposits Amount".
+<think>Let me analyze the comparison between PDF and Web sources for the two fields: "Lease property tax" and "Deposits Amount".
 
-### 1. Lease property tax comparison
+### 1. Lease property tax
 
 From the PDF source:
 - "Lease property tax rate": "10.00"
@@ -601,53 +470,47 @@ From the PDF source:
 From the Web source:
 - "Lease property tax rate": "PTS - PT Standard"
 
-According to the validation rules:
+Now, let's apply the validation rules:
 1. Web value "PTS-PT Standard" (ignore spaces) → PDF must be "10.00" to be valid
 2. Web value "PT Mall" (ignore spaces) → PDF must be "12.5" to be valid  
-3...
-[DEBUG stripThinkTags] Input length: 14403
+3. Web value null/...
+[DEBUG stripThinkTags] Input length: 14172
 [DEBUG stripThinkTags] First 200 chars: 
-<think>Let me analyze the comparison between PDF and Web sources for the two fields mentioned: "Lease property tax" and "Deposits Amount".
+<think>Let me analyze the comparison between PDF and Web sources for the two fields: "Lease property tax" and "Deposits Amount".
 
-### 1. Lease property tax comparison
+### 1. Lease property tax
 
 From the PDF source:
-
-[DEBUG stripThinkTags] Last 200 chars:  the most detailed comparison and aligns with the structure of the source data.
+- "Lease property tax
+[DEBUG stripThinkTags] Last 200 chars: d provide a JSON response that includes both the "Lease property tax" comparison and the deposit comparisons:
 
 ```json
 [
   {
-    "field": "Lease property tax", 
+    "field": "Lease property tax",
     "pdf": "10.00",
-    "web": "PTS - PT Standard",
-    "match": true
+    "web": "PTS - PT
 [DEBUG stripThinkTags] Found unclosed think tag
 [DEBUG stripThinkTags] Found JSON content, preserving it
-[DEBUG stripThinkTags] Output length: 12011
+[DEBUG stripThinkTags] Output length: 11881
 [DEBUG stripThinkTags] Output preview: [
   {
-    "field": "Lease property tax", 
+    "field": "Lease property tax",
     "pdf": "10.00",
     "web": "PTS - PT Standard",
     "match": true,
-    "reason": "Tax rule applied - Web value 'PTS-PT Standard' (ignoring spaces) require
-[🧹 tax_deposits after cleaning length: 12011
-[⚠️ Failed to parse category tax_deposits results] Unexpected non-whitespace character after JSON at position 588 (line 26 column 1)
-[🔍 Raw response preview for tax_deposits]: [
-  {
-    "field": "Lease property tax", 
-    "pdf": "10.00",
-    "web": "PTS - PT Standard",
-    "match": true,
-    "reason": "Tax rule applied - Web value 'PTS-PT Standard' (ignoring spaces) require...
-[✅ Lotus LLM comparison complete - 43 fields compared]
-[📊 All comparison fields: อยู่กองทรัสต์หรือไม่, Building Name, Brand Name, Customer Name, Customer Address, Unit ID, Space (NLA), Tenant Type, Proposed lease commencement date, Proposed lease expiry date, Billing Frequency, Lease Type, Billing Frequency, Monthly charge, Year 1 : Contract Start date, Year 1 : Contract End date, Year 1 : Charge Type, Year 1 : Monthly Amount of rent, Year 1 : Monthly Amount of service, Year 2 : Contract Start date, Year 2 : Contract End date, Year 2 : Charge Type, Year 2 : Monthly Amount of rent, Year 2 : Monthly Amount of service, Year 3 : Contract Start date, Year 3 : Contract End date, Year 3 : Charge Type, Year 3 : Monthly Amount of rent, Year 3 : Monthly Amount of service, Total Rent Deposits, Total Service Deposits, Other service charge (in the renting space), Other service charge (in the renting space) Charge description, Other service charge (in the renting space) start date, Other service charge (in the renting space) end date, Other service charge (Common area), Other service charge (Common area) Charge description, Other service charge (Common area) start date, Other service charge (Common area) end date, Include Utility, Utilities charge (water), Utilities charge (Electricity), Utilities charge (cooking gas)
+    "reason": "Tax rule applied: Web value 'PTS-PT Standard' (ignoring spaces) requires 
+[🧹 tax_deposits after cleaning length: 11881
+[🔧 tax_deposits] Trimming extra content after JSON array
+[✅ tax_deposits parsed successfully - 3 fields]
+[📊 tax_deposits fields: Lease property tax, Total Rent Deposits, Total Service Deposits
+[✅ Lotus LLM comparison complete - 45 fields compared]
+[📊 All comparison fields: อยู่กองทรัสต์หรือไม่, Building Name, Brand Name, Customer Name, Customer Address, Unit ID, Space (NLA), Tenant Type, Proposed lease commencement date, Proposed lease expiry date, Lease Type, Billing Frequency, Monthly charge, Year 1 : Contract Start date, Year 1 : Contract End date, Year 1 : Charge Type, Year 1 : Monthly Amount of rent, Year 1 : Monthly Amount of service, Year 2 : Contract Start date, Year 2 : Contract End date, Year 2 : Charge Type, Year 2 : Monthly Amount of rent, Year 2 : Monthly Amount of service, Year 3 : Contract Start date, Year 3 : Contract End date, Year 3 : Charge Type, Year 3 : Monthly Amount of rent, Year 3 : Monthly Amount of service, Total Rent Deposits, Total Service Deposits, Other service charge (in the renting space), Other service charge (in the renting space) Charge description, Other service charge (in the renting space) start date, Other service charge (in the renting space) end date, Other service charge (Common area), Other service charge (Common area) Charge description, Other service charge (Common area) start date, Other service charge (Common area) end date, Include Utility, Utilities charge (water), Utilities charge (Electricity), Utilities charge (cooking gas), Lease property tax, Total Rent Deposits, Total Service Deposits
 [📈 Results per category: {
-  basic: 13,
+  basic: 12,
   service_charges: 12,
   lease_terms: 15,
-  tax_deposits: 2,
+  tax_deposits: 5,
   utilities: 1
 }
 [🔄 Using modular validation]
@@ -665,7 +528,7 @@ From the PDF source:
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/pdf_validation/required_fields.txt
 [✅ Prompt loaded] 1642 characters from permanent_fixed/pdf_validation/required_fields.txt
 [✅ Validation category required processed successfully]
-[DEBUG stripThinkTags] Input length: 778
+[DEBUG stripThinkTags] Input length: 926
 [DEBUG stripThinkTags] First 200 chars: [
   {
     "field": "Contract Number",
@@ -677,17 +540,16 @@ From the PDF source:
     "field": "Brand Name",
     "value": "มิตซู บีเอ็นที",
   
-[DEBUG stripThinkTags] Last 200 chars:     "valid": true,
-    "reason": "Building ID present"
+[DEBUG stripThinkTags] Last 200 chars: R contract - Property Type validation skipped"
   },
   {
-    "field": "Property Type",
+    "field": "Space Design Type",
     "value": null,
     "valid": true,
-    "reason": "LR contract - Property Type validation skipped"
+    "reason": "LR contract - Space Design Type validation skipped"
   }
 ]
-[DEBUG stripThinkTags] Output length: 778
+[DEBUG stripThinkTags] Output length: 926
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Contract Number",
@@ -699,78 +561,78 @@ From the PDF source:
     "field": "Brand Name",
     "value": "มิตซู บีเอ็นที",
   
-[✅ Validation required parsed successfully - 6 checks]
-[📊 Validation required fields: Contract Number, Brand Name, Tenant Type, Unit ID, Building ID, Property Type
+[✅ Validation required parsed successfully - 7 checks]
+[📊 Validation required fields: Contract Number, Brand Name, Tenant Type, Unit ID, Building ID, Property Type, Space Design Type
 [📊 Processing validation category: business]
 [📁 Loading prompt file] permanent_fixed/pdf_validation/business_rules.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/pdf_validation/business_rules.txt
-[✅ Prompt loaded] 1234 characters from permanent_fixed/pdf_validation/business_rules.txt
+[✅ Prompt loaded] 2078 characters from permanent_fixed/pdf_validation/business_rules.txt
 [✅ Validation category business processed successfully]
-[DEBUG stripThinkTags] Input length: 517
+[DEBUG stripThinkTags] Input length: 1225
 [DEBUG stripThinkTags] First 200 chars: [
   {
-    "field": "Billing Frequency",
+    "field": "Billing Frequency", 
     "value": null,
     "valid": true,
-    "reason": "Valid because contract number contains 'LR'"
+    "reason": "Contract number contains 'LR', so Billing Frequency is valid even if NULL"
   },
   {
-    "field": "Net Rent (p.m.)",
-    "value": "9,937.4
-[DEBUG stripThinkTags] Last 200 chars:  "valid": true,
-    "reason": "Valid because contract number contains 'LR'"
-  },
-  {
-    "field": "Include Utility",
-    "value": "No",
+    "field": "Net Rent
+[DEBUG stripThinkTags] Last 200 chars: 92.00",
     "valid": true,
-    "reason": "Include Utility is 'No'"
+    "reason": "Rental Deposit is valid"
+  },
+  {
+    "field": "Service Deposit", 
+    "value": "57,888.00",
+    "valid": true,
+    "reason": "Service Deposit is valid"
   }
 ]
-[DEBUG stripThinkTags] Output length: 517
+[DEBUG stripThinkTags] Output length: 1225
 [DEBUG stripThinkTags] Output preview: [
   {
-    "field": "Billing Frequency",
+    "field": "Billing Frequency", 
     "value": null,
     "valid": true,
-    "reason": "Valid because contract number contains 'LR'"
+    "reason": "Contract number contains 'LR', so Billing Frequency is valid even if NULL"
   },
   {
-    "field": "Net Rent (p.m.)",
-    "value": "9,937.4
-[✅ Validation business parsed successfully - 4 checks]
-[📊 Validation business fields: Billing Frequency, Net Rent (p.m.), Payment Term, Include Utility
+    "field": "Net Rent
+[✅ Validation business parsed successfully - 9 checks]
+[📊 Validation business fields: Billing Frequency, Net Rent (p.m.), Payment Term, Include Utility, Tenant selection, Monthly Rental Rate, Monthly Service Rate, Rental Deposit, Service Deposit
 [📊 Processing validation category: deposits]
 [📁 Loading prompt file] permanent_fixed/pdf_validation/deposit_rules.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/pdf_validation/deposit_rules.txt
 [✅ Prompt loaded] 1801 characters from permanent_fixed/pdf_validation/deposit_rules.txt
 [✅ Validation category deposits processed successfully]
-[DEBUG stripThinkTags] Input length: 263
+[DEBUG stripThinkTags] Input length: 244
 [DEBUG stripThinkTags] First 200 chars: [
   {
     "field": "Tenancy Deposit",
     "value": "38,592.00",
     "valid": true,
-    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. D
-[DEBUG stripThinkTags] Last 200 chars: 
+    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. R
+[DEBUG stripThinkTags] Last 200 chars: alue": "38,592.00",
     "valid": true,
-    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. Deposit (38,592.00) ≥ 3 × Monthly rental rate (29,812.32)"
+    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. Required: 29,812.32, Actual: 38,592.00"
   }
 ]
-[DEBUG stripThinkTags] Output length: 263
+[DEBUG stripThinkTags] Output length: 244
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Tenancy Deposit",
     "value": "38,592.00",
     "valid": true,
-    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. D
+    "reason": "Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules. R
 [✅ Validation deposits parsed successfully - 1 checks]
 [📊 Validation deposits fields: Tenancy Deposit
 [📊 Processing validation category: signatures]
 [📁 Loading prompt file] permanent_fixed/pdf_validation/signature_validation.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/pdf_validation/signature_validation.txt
 [✅ Prompt loaded] 1026 characters from permanent_fixed/pdf_validation/signature_validation.txt
-[✅ Validation category signatures processed successfully]
+[❌ Failed to process validation category signatures] Request failed with status code 504
+[🔄 Retrying signatures with reduced token limit due to 504 timeout]
 [DEBUG stripThinkTags] Input length: 1130
 [DEBUG stripThinkTags] First 200 chars: [
   {
@@ -802,17 +664,38 @@ From the PDF source:
   },
   {
     "field": "CP Axtra signee 1 (name of the signed pers
-[✅ Validation signatures parsed successfully - 8 checks]
-[📊 Validation signatures fields: CP Axtra signee 1 (has signature or not), CP Axtra signee 1 (name of the signed person), CP Axtra witness (has signature or not), CP Axtra witness (name of the signed person), Customer signee 1 (has signature or not), Customer signee 1 (name of the signed person), Customer witness (has signature or not), Customer witness (name of the signed person)
+[🔄 signatures retry response length: 1130
+[✅ signatures retry successful - 8 validation items]
 [📊 Processing validation category: citizen_id]
 [📁 Loading prompt file] permanent_fixed/pdf_validation/citizen_id_validation.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/pdf_validation/citizen_id_validation.txt
 [✅ Prompt loaded] 5340 characters from permanent_fixed/pdf_validation/citizen_id_validation.txt
 [❌ Failed to process validation category citizen_id] Request failed with status code 504
 [🔄 Retrying citizen_id with reduced token limit due to 504 timeout]
-[⚠️ citizen_id retry also failed: finalPrompt is not defined
-[✅ Lotus LLM validation complete - 19 validation checks]
-[📊 All validation fields: Contract Number, Brand Name, Tenant Type, Unit ID, Building ID, Property Type, Billing Frequency, Net Rent (p.m.), Payment Term, Include Utility, Tenancy Deposit, CP Axtra signee 1 (has signature or not), CP Axtra signee 1 (name of the signed person), CP Axtra witness (has signature or not), CP Axtra witness (name of the signed person), Customer signee 1 (has signature or not), Customer signee 1 (name of the signed person), Customer witness (has signature or not), Customer witness (name of the signed person)
+[DEBUG stripThinkTags] Input length: 7020
+[DEBUG stripThinkTags] First 200 chars: 
+<think>Let me analyze this contract data and validate the citizen ID requirements based on the provided rules.
+
+First, I need to determine the customer type:
+- The "Individual or Corporate" field is 
+[DEBUG stripThinkTags] Last 200 chars: ": false,
+    "reason": "Certificate document needs to be checked for registration number"
+  },
+  {
+    "field": "Company Certificate issued date",
+    "value": null,
+    "valid": false,
+    "reason":
+[DEBUG stripThinkTags] Found unclosed think tag
+[DEBUG stripThinkTags] Found JSON content, preserving it
+[DEBUG stripThinkTags] Output length: 2758
+[DEBUG stripThinkTags] Output preview: [10-15 digits]" in the certificate document, but I don't have access to it. I'll mark this as invalid with a note that the certificate document needs to be checked.
+
+7. "Company Certificate issued dat
+[🔄 citizen_id retry response length: 2758
+[⚠️ citizen_id retry also failed: Expected ',' or ']' after array element in JSON at position 3 (line 1 column 4)
+[✅ Lotus LLM validation complete - 25 validation checks]
+[📊 All validation fields: Contract Number, Brand Name, Tenant Type, Unit ID, Building ID, Property Type, Space Design Type, Billing Frequency, Net Rent (p.m.), Payment Term, Include Utility, Tenant selection, Monthly Rental Rate, Monthly Service Rate, Rental Deposit, Service Deposit, Tenancy Deposit, CP Axtra signee 1 (has signature or not), CP Axtra signee 1 (name of the signed person), CP Axtra witness (has signature or not), CP Axtra witness (name of the signed person), Customer signee 1 (has signature or not), Customer signee 1 (name of the signed person), Customer witness (has signature or not), Customer witness (name of the signed person)
 [✅ Modular validation complete]
 [🔥 compare_result] Validation result saved for: 5114_LR2505_00107
 [✅ Saved validation_result]
@@ -831,106 +714,36 @@ From the PDF source:
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/web_validation/required_fields.txt
 [✅ Prompt loaded] 1923 characters from permanent_fixed/web_validation/required_fields.txt
 [✅ Validation category required processed successfully]
-[DEBUG stripThinkTags] Input length: 2872
+[DEBUG stripThinkTags] Input length: 2870
 [DEBUG stripThinkTags] First 200 chars: [
   {
     "field": "Contract Number",
     "value": "5114/LR2505/00107",
     "valid": true,
-    "reason": "Contract number is present and matches the required format for LR contracts."
+    "reason": "The contract number follows the required format for LR contracts (xxxx_LRxxxx_xxxxx)"
   },
   {
-    "fi
-[DEBUG stripThinkTags] Last 200 chars: present and is a percentage value."
+[DEBUG stripThinkTags] Last 200 chars: s present and is a percentage value"
   },
   {
     "field": "Lease Type",
     "value": "Permanent Fixed",
     "valid": true,
-    "reason": "Lease type matches the contract type (Permanent Fixed)."
+    "reason": "Lease type matches the contract type 'Permanent Fixed'"
   }
 ]
-[DEBUG stripThinkTags] Output length: 2872
+[DEBUG stripThinkTags] Output length: 2870
 [DEBUG stripThinkTags] Output preview: [
   {
     "field": "Contract Number",
     "value": "5114/LR2505/00107",
     "valid": true,
-    "reason": "Contract number is present and matches the required format for LR contracts."
+    "reason": "The contract number follows the required format for LR contracts (xxxx_LRxxxx_xxxxx)"
   },
   {
-    "fi
 [✅ Validation required parsed successfully - 18 checks]
 [📊 Validation required fields: Contract Number, Workflow status, Customer Name, Brand Name, Tenant Type, Unit ID, Building ID, Building Name, Property Type, Space Design Type, Space (NLA), Monthly Rental Rate, Net Rent (p.m.), Billing option, Billing Frequency, Payment Term, Rental Ratio, Lease Type
 [📊 Processing validation category: business]
 [📁 Loading prompt file] permanent_fixed/web_validation/business_rules.txt
 [🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/web_validation/business_rules.txt
 [✅ Prompt loaded] 2129 characters from permanent_fixed/web_validation/business_rules.txt
-[❌ Failed to process validation category business] Request failed with status code 504
-[🔄 Retrying business with reduced token limit due to 504 timeout]
-[⚠️ business retry also failed: finalPrompt is not defined
-[📊 Processing validation category: deposits]
-[📁 Loading prompt file] permanent_fixed/web_validation/deposit_rules.txt
-[🗂️ Full path] /Users/harveygunjarueg/my-vision-app Cluade Fix/server/prompts/permanent_fixed/web_validation/deposit_rules.txt
-[✅ Prompt loaded] 7435 characters from permanent_fixed/web_validation/deposit_rules.txt
-[✅ Validation category deposits processed successfully]
-[DEBUG stripThinkTags] Input length: 1523
-[DEBUG stripThinkTags] First 200 chars: [
-  {
-    "field": "Monthly Rental Rate",
-    "value": "9,937.44",
-    "valid": true,
-    "reason": "Monthly rental rate is present as numerical value"
-  },
-  {
-    "field": "Monthly Service Rate",
-  
-[DEBUG stripThinkTags] Last 200 chars: tility charge is 0 as Include Utility is 'No'"
-  },
-  {
-    "field": "Utilities (Gas)",
-    "value": "0.00",
-    "valid": true,
-    "reason": "Gas utility charge is 0 as Include Utility is 'No'"
-  }
-]
-[DEBUG stripThinkTags] Output length: 1523
-[DEBUG stripThinkTags] Output preview: [
-  {
-    "field": "Monthly Rental Rate",
-    "value": "9,937.44",
-    "valid": true,
-    "reason": "Monthly rental rate is present as numerical value"
-  },
-  {
-    "field": "Monthly Service Rate",
-  
-[✅ Validation deposits parsed successfully - 9 checks]
-[📊 Validation deposits fields: Monthly Rental Rate, Monthly Service Rate, Rental Deposit, Service Deposit, Tenancy Deposit, Include Utility, Utilities (water), Utilities (Electricity), Utilities (Gas)
-[✅ Lotus LLM validation complete - 27 validation checks]
-[📊 All validation fields: Contract Number, Workflow status, Customer Name, Brand Name, Tenant Type, Unit ID, Building ID, Building Name, Property Type, Space Design Type, Space (NLA), Monthly Rental Rate, Net Rent (p.m.), Billing option, Billing Frequency, Payment Term, Rental Ratio, Lease Type, Monthly Rental Rate, Monthly Service Rate, Rental Deposit, Service Deposit, Tenancy Deposit, Include Utility, Utilities (water), Utilities (Electricity), Utilities (Gas)
-[✅ Modular web validation complete]
-[🔥 compare_result] Validation result saved for: 5114_LR2505_00107
-[✅ Saved web_validation_result]
-[🔧 AutoProcessor] Checking if meter validation needed...
-[🔧 AutoProcessor] parsedWeb["Include Utility"]: No
-[🔧 AutoProcessor] extractedContractNumber: 5114_LR2505_00107
-[🔧 AutoProcessor] contractNumber.includes("LO"): false
-[🔧 AutoProcessor] utilityValue (normalized): No
-[🔧 AutoProcessor] isUtilityYes: false
-[🔧 AutoProcessor] Skipping meter check - Include Utility not Yes or not LO contract
-[🔧 AutoProcessor] Final payload meterValidationResult: null
-[🔧 AutoProcessor] Final payload meterValidationResult type: object
-[Debug] Incoming save payload: {
-  contractNumber: '5114_LR2505_00107',
-  compareResult: 'present',
-  pdfGemini: 'present',
-  webGemini: 'present',
-  validationResult: '19 items',
-  webValidationResult: '27 items',
-  meterValidationResult: 'missing',
-  popupUrl: undefined
-}
-[Firebase Save] Saving popup_url: undefined
-[🔥 compare_result] Document saved: 5114_LR2505_00107
-[✅ Saved compare + all validations together]

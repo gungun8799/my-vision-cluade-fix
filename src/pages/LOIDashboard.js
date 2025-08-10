@@ -1039,7 +1039,21 @@ const getContractDate = (ts) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(contract.compare_result || []).map((row, i) => (
+                      {(contract.compare_result || [])
+                        .filter(row => {
+                          // DEBUG: Show all fields temporarily - only filter out Billing Frequency
+                          if (row.field === 'Billing Frequency') {
+                            return false;
+                          }
+                          // TEMPORARILY DISABLED: Hide NULL year rows
+                          // if ((row.field?.includes('Year 2') || row.field?.includes('Year 3')) && 
+                          //     (!row.pdf || row.pdf === 'NULL' || row.pdf === null || row.pdf === '' ||
+                          //      !row.web || row.web === 'NULL' || row.web === null || row.web === '')) {
+                          //   return false;
+                          // }
+                          return true;
+                        })
+                        .map((row, i) => (
                         <tr key={i}>
                           <td>{row.field}</td>
                           <td>{row.pdf}</td>
@@ -1062,7 +1076,16 @@ const getContractDate = (ts) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(contract.validation_result || []).map((row, i) => (
+                      {(contract.validation_result || [])
+                        .filter(row => {
+                          // Hide NULL year rows
+                          if ((row.field?.includes('Year 2') || row.field?.includes('Year 3')) && 
+                              (!row.value || row.value === 'NULL' || row.value === null || row.value === '')) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map((row, i) => (
                         <tr key={i}>
                           <td>{row.field}</td>
                           <td>{row.value}</td>
@@ -1084,7 +1107,16 @@ const getContractDate = (ts) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(contract.web_validation_result || []).map((row, i) => (
+                      {(contract.web_validation_result || [])
+                        .filter(row => {
+                          // Hide NULL year rows
+                          if ((row.field?.includes('Year 2') || row.field?.includes('Year 3')) && 
+                              (!row.value || row.value === 'NULL' || row.value === null || row.value === '')) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map((row, i) => (
                         <tr key={i}>
                           <td>{row.field}</td>
                           <td>{row.value}</td>
@@ -1108,7 +1140,8 @@ const getContractDate = (ts) => {
                           </tr>
                         </thead>
                         <tbody>
-                          {contract.meter_validation_result.map((row, i) => (
+                          {contract.meter_validation_result
+                            .map((row, i) => (
                             <tr key={i}>
                               <td>{row.field}</td>
                               <td>{row.value ?? '—'}</td>
