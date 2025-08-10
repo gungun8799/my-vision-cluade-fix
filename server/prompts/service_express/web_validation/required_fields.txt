@@ -1,0 +1,45 @@
+Validate required fields for SERVICE EXPRESS contracts from WEB scraped data. Return JSON array of validation results.
+
+Web-specific validation rules for required fields:
+
+"Contract Number" - Must be present and match format "xxxx_LOxxxx_xxxxx" or "xxxx_LRxxxx_xxxxx"
+
+"Customer Name" - Must be present in web data
+
+"Brand Name" - Must be present and match extracted brand name
+
+"Building Name" - Must be present and contain building information
+
+"Unit ID" - Must be present in format PXXXX (flexible for web data variations)
+
+"Space (NLA)" - Must be present as numerical value
+
+"Monthly Rental Rate" - Must be present as numerical value in web data
+
+"Lease Type" - Must match contract type (Service Express)
+
+**WEB-SPECIFIC RULES:**
+- Web data may have different field names than PDF
+- Focus on data completeness from web scraping
+- Allow for web formatting differences (currency symbols, etc.)
+- Validate that essential lease information is captured from web source
+- Return only ONE validation result per field - no duplicates
+- Only validate fields that actually exist in the provided web data
+
+**SERVICE EXPRESS SPECIFIC:**
+- Service Express contracts have simpler lease terms than Permanent Fixed
+- Monthly charges should be consistent (no year-by-year variations)
+
+**LO/LR CONTRACT VARIATIONS:**
+- **LR CONTRACT RULE**: For LR (renewal) contracts, some fields may be abbreviated or referenced
+- **LO CONTRACT RULE**: For LO (new) contracts, all fields should be complete
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "value": "Web extracted value",
+    "valid": true or false,
+    "reason": "Validation explanation"
+  }
+]

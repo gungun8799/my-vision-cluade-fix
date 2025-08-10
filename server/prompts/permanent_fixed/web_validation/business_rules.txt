@@ -1,0 +1,40 @@
+Validate business rules for PERMANENT FIXED contracts from WEB scraped data. Return JSON array of validation results.
+
+Web-specific business rule validation:
+
+"Space Design Type" - **LR SKIP RULE:** If contract contains "LR": always valid "LR contract - Space Design Type validation skipped". Otherwise: Contextual match with "Tenant Type" value. The Space Design Type should match the tenant category from web data by context, allowing for different formats. Examples: "PNL2 - PN Local - Health & Beauty" should match "PN Local - Health & Beauty", or "PN Local - Health & Beauty" should match both. Focus on the meaningful tenant category part, ignoring prefixes like codes. If no contextual match: invalid "Space Design Type ('<value>') does not contextually match Tenant Type ('<Tenant Type>')". If match found: valid "Space Design Type contextually matches Tenant Type"
+
+"Building ID" - Validate 4-digit format from web source
+
+"อยู่กองทรัสต์หรือไม่" - Cross-reference with Building ID from web data (if starts with "00" = "Yes")
+
+"Brand Name" - Must exist in web Master_PT.xlsx reference (if available via web API)
+
+"Customer Type" - Validate Individual vs Corporate from web customer information
+
+"Unit Status" - Validate unit availability and lease status from web data
+
+**WEB-SPECIFIC BUSINESS RULES:**
+- Web data source validation (ensure data comes from authenticated Simplicity session)
+- Cross-reference web unit information with building database
+- Validate lease dates are future-dated and logical
+- Check for conflicts with existing web lease records
+
+**LO/LR BUSINESS VARIATIONS:**
+- **LR CONTRACT RULE**: Renewal contracts may have relaxed validation on certain business rules
+- **LO CONTRACT RULE**: New lease offers require stricter business rule validation
+
+**WEB DATA INTEGRITY:**
+- Validate web session was active during scraping
+- Check for complete data extraction (no partial records)
+- Verify web data freshness (not cached or stale data)
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "value": "Web extracted value",
+    "valid": true or false,
+    "reason": "Web business rule explanation"
+  }
+]

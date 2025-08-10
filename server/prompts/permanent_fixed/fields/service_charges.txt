@@ -1,0 +1,26 @@
+Extract service charge information and return in JSON format.
+
+Required fields:
+"Other service charge before tax (in the renting space)" - Service charge amount for renting space
+
+"Other service charge (in the renting space) Charge description" - Often "ค่าบริการสำหรับไอเย็น" which means "Common Area Cool Air Service Fee". If "Other service charge (in the renting space)" is 0, this field can be null.
+
+"Other service charge (in the renting space) start date" - If Other service charge is not null, use contract start date
+
+"Other service charge (in the renting space) end date" - If Other service charge is not null, use contract end date
+
+"Other service charge before tax (Common area)" - Service charge for common area
+
+"Other service charge (Common area) Charge description" - Often "ค่าบริการสำหรับไอเย็น" meaning "Common Area Cool Air Service Fee"
+
+"Other service charge (Common area) start date" - If Other service charge is not null, use contract start date
+
+"Other service charge (Common area) end date" - If Other service charge is not null, use contract end date
+
+"Other service charge before tax (public space)" - If cannot find anything, put 0.00
+
+"Other service charge (public space) Charge description" - Description for public space charges
+
+"Other service charge (public space) start date" - Start date for public space charges
+
+"Other service charge (public space) end date" - End date for public space charges

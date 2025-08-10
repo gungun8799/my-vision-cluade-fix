@@ -1,0 +1,21 @@
+Validate business rules and return JSON array of validation results.
+
+Validation Rules:
+
+"Billing Frequency" - If contract number contains "LR": mark as valid even if NULL. Valid if value == "Monthly". If null/empty: invalid "Billing Frequency is missing". If not "Monthly": invalid "Billing Frequency ('<value>') is not 'Monthly'". Else valid "Billing Frequency is 'Monthly'"
+
+"Net Rent (p.m.)" - Valid if numeric and > 0. If null/non-numeric/≤ 0: invalid "Net Rent ('<value>') is not a positive number". Else valid "Net Rent is valid"
+
+"Payment Term" - If contract number contains "LR": mark as valid even if NULL. Valid if value == "due in 7 days" (case-insensitive). If null/empty: invalid "Payment Term is missing". If not "due in 7 days": invalid "Payment Term ('<value>') is not 'due in 7 days'". Else valid "Payment Term is 'due in 7 days'"
+
+"Include Utility" - Valid if value == "Yes" or "No". If null/empty: invalid "Include Utility is missing". If not "Yes" or "No": invalid "Include Utility ('<value>') must be 'Yes' or 'No'". Else valid "Include Utility is '<value>'"
+
+Return format:
+[
+  {
+    "field": "Field name", 
+    "value": "Extracted value (or null)",
+    "valid": true or false,
+    "reason": "Explanation"
+  }
+]

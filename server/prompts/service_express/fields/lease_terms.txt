@@ -1,0 +1,16 @@
+Extract lease terms for SERVICE EXPRESS contracts and return in JSON format.
+
+Required fields:
+"Lease Type" - For both PDF and Web scrape, put result as "Service Express"
+
+"Lease property tax rate" - Check for formats like "PTS - PT Standard", "PT - MALL", or numbers "10", "12.5"
+
+"Monthly charge" - Output "Yes" if indicates recurring monthly fee (contains "per month," "monthly," "each month"), otherwise "No"
+
+"Charge Type" - For PDF scrape, always put as "Service Charge-Fixed"
+
+Monthly Amount Calculation:
+Find row where 'CHARGE DESCRIPTION' is exactly 'Monthly Amount'. Extract value by subtracting 'TAX AMOUNT' from 'TOTAL AMOUNT INCLUDING TAX'.
+Formula: TOTAL AMOUNT INCLUDING TAX − TAX AMOUNT = Monthly Amount of Service
+
+"Deposit Amount" - Total deposit amount

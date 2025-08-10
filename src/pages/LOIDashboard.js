@@ -6,8 +6,6 @@ import { BarChartBig, RefreshCcw } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import * as XLSX from 'xlsx';
 
-
-
 import {
   Chart as ChartJS,
   BarElement,
@@ -18,6 +16,13 @@ import {
 } from 'chart.js';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Title);
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
+// a single axios instance, pointing straight at your backend:
+const api = axios.create({
+  baseURL: `${API_URL}/api`,
+});
+
 
 function LOIDashboard({ user }) {
   const navigate = useNavigate(); 
@@ -25,21 +30,29 @@ function LOIDashboard({ user }) {
   const [filteredContracts, setFilteredContracts] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [weekStats, setWeekStats] = useState({});
+  
   // at the top of LOIDashboard(), right after your other useState calls:
 const [editingWorkflowFor, setEditingWorkflowFor] = useState(null);
   const [refreshingContracts, setRefreshingContracts] = useState({});
-  const [filters, setFilters] = useState({
-    workflowStatus: '',
-    tenantType: '',
-    status: '',
-    search: '',
-    leadStatus: ''  // ← new
-  });
+   const [filters, setFilters] = useState({
+       workflowStatus: '',
+       tenantTypes:   [],    // ← multi
+       leaseTypes:    [],    // ← multi
+       status:        '',
+       search:        '',
+       leadStatus:    ''
+     });
+     // at the top of LOIDashboard, after your other useState calls:
+
   const [leadStatuses, setLeadStatuses] = useState({});
   const handleLogout = () => {
    localStorage.removeItem('user');
    navigate('/login', { replace: true });
  };
+
+ const [showExplorer, setShowExplorer] = useState(false);
+const [contractsFolderFiles, setContractsFolderFiles] = useState([]);
+const [processedFolderFiles, setProcessedFolderFiles] = useState([]);
 
   const [exportFrom, setExportFrom] = useState(''); // e.g. "2025-06-01"
 const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
@@ -52,7 +65,6 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
     const [successMessage, setSuccessMessage] = useState(null);
     const [errorAuto, setErrorAuto] = useState(null);
     const [sharepointPath, setSharepointPath] = useState('');
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 
   // ─── Failsafe states ─────────────────────────────────────────────────────────
@@ -62,10 +74,16 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
    const [isOnline, setIsOnline] = useState(navigator.onLine);
    
    useEffect(() => {
+    if (!showExplorer) return;
+    api.get('/list-files?folder=contracts').then(res => setContractsFolderFiles(res.data.files));
+    api.get('/list-files?folder=processed').then(res => setProcessedFolderFiles(res.data.files));
+  }, [showExplorer]);
+
+   useEffect(() => {
     // Fetch contracts + lead statuses
     const fetchData = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/get-compare-results`);
+        const res = await api.get('/get-compare-results');
         if (res.data.success && Array.isArray(res.data.data)) {
           const rawContracts = res.data.data;
           setContracts(rawContracts);
@@ -73,7 +91,7 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
           computeWeeklyStats(rawContracts);
         }
   
-        const leadRes = await axios.get(`${API_URL}/api/get-lead-statuses`);
+        const leadRes = await api.get('/get-lead-statuses');
         if (leadRes.data.success && leadRes.data.statuses) {
           setLeadStatuses(leadRes.data.statuses);
         }
@@ -130,6 +148,18 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
     if (filters.tenantType) {
       filteredData = filteredData.filter(contract => contract.tenant_type === filters.tenantType);
     }
+     // multi-tenant-type support
+ if (filters.tenantTypes.length > 0) {
+   filteredData = filteredData.filter(c =>
+     filters.tenantTypes.includes(c.tenant_type)
+   );
+ }
+ // same for leaseTypes
+ if (filters.leaseTypes.length > 0) {
+   filteredData = filteredData.filter(c =>
+     filters.leaseTypes.includes(c.lease_type)
+   );
+ }
     if (filters.status) {
       filteredData = filteredData.filter(contract => isValid(contract) === (filters.status === 'Passed'));
     }
@@ -156,6 +186,30 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
     return validationValid && compareValid;
   };
 
+  // control the open/closed state of each dropdown
+const [showLeaseDropdown,  setShowLeaseDropdown]  = useState(false);
+const [showTenantDropdown, setShowTenantDropdown] = useState(false);
+
+// toggle a single Lease Type on/off
+const toggleLeaseType = (type) => {
+  setFilters(prev => {
+    const list = prev.leaseTypes.includes(type)
+      ? prev.leaseTypes.filter(t => t !== type)
+      : [...prev.leaseTypes, type];
+    return { ...prev, leaseTypes: list };
+  });
+};
+
+// toggle a single Tenant Type on/off
+const toggleTenantType = (type) => {
+  setFilters(prev => {
+    const list = prev.tenantTypes.includes(type)
+      ? prev.tenantTypes.filter(t => t !== type)
+      : [...prev.tenantTypes, type];
+    return { ...prev, tenantTypes: list };
+  });
+};
+
   const computeWeeklyStats = (contracts) => {
     const now = new Date();
     const weekStart = new Date(now);
@@ -181,92 +235,48 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
   const reviewCount = filteredContracts.length - passedCount;
 
   const handleExport = () => {
-    exportBetween(exportFromRaw, exportToRaw);
-    // 1) Log the raw “from” / “to” strings
-    console.log('▶️ Export From (raw):', exportFromRaw);
-    console.log('▶️ Export To   (raw):', exportToRaw);
-  
-    // 2) Parse those into JS Dates.
-    //    • “from” at 00:00:00
-    //    • “to”   at 23:59:59.999
+    // 1) Parse “from” / “to” into Date objects
     let fromDate = null,
-        toDate = null;
-  
+        toDate   = null;
     if (exportFromRaw) {
       fromDate = new Date(exportFromRaw);
-      fromDate.setHours(0, 0, 0, 0);
+      fromDate.setHours(0,0,0,0);
     }
     if (exportToRaw) {
       toDate = new Date(exportToRaw);
-      toDate.setHours(23, 59, 59, 999);
+      toDate.setHours(23,59,59,999);
     }
   
-    console.log('▶️ Parsed fromDate:', fromDate);
-    console.log('▶️ Parsed toDate:  ', toDate);
-  
-    // 3) Build a new array, filtering by timestamp range
-    const inRange = filteredContracts.filter((contract) => {
+    // 2) Filter contracts by that range
+    const inRange = filteredContracts.filter(contract => {
       const ts = contract.timestamp;
-      console.log(`  • [${contract.contract_number}] raw timestamp:`, ts);
-  
       let actualDate = null;
   
-      // 3a) If it's a Firestore Timestamp object, use its .toDate()
+      // Firestore Timestamp?
       if (ts && typeof ts.toDate === 'function') {
         actualDate = ts.toDate();
-        console.log(`    → via .toDate(): ${actualDate.toString()}`);
       }
-      // 3b) If it’s a plain JSON with _seconds/_nanoseconds
+      // plain JSON _seconds?
       else if (ts && ts._seconds != null) {
-        const sec = ts._seconds;
-        const nano = ts._nanoseconds || 0;
-        actualDate = new Date(sec * 1000 + nano / 1e6);
-        console.log(`    → via _seconds/_nanoseconds: ${actualDate.toString()}`);
+        actualDate = new Date(ts._seconds * 1000 + (ts._nanoseconds||0)/1e6);
       }
-      // 3c) Or if it has seconds/nanoseconds without underscores
+      // seconds/nanoseconds variant?
       else if (ts && ts.seconds != null) {
-        const sec = ts.seconds;
-        const nano = ts.nanoseconds || 0;
-        actualDate = new Date(sec * 1000 + nano / 1e6);
-        console.log(`    → via seconds/nanoseconds: ${actualDate.toString()}`);
+        actualDate = new Date(ts.seconds * 1000 + (ts.nanoseconds||0)/1e6);
       }
-      // 3d) Otherwise, try to treat ts as a normal JS date string / Date
+      // fallback
       else {
         actualDate = new Date(ts);
-        console.log(`    → via new Date(ts): ${actualDate.toString()}`);
       }
   
-      // 3e) If invalid, skip it
-      if (!actualDate || isNaN(actualDate.getTime())) {
-        console.warn(
-          `    ❌ [${contract.contract_number}] invalid Date → excluded`
-        );
-        return false;
-      }
-  
-      // 4) If either fromDate or toDate is set, enforce range.
-      if (fromDate && actualDate < fromDate) {
-        console.warn(
-          `    ❌ [${contract.contract_number}] before fromDate → excluded`
-        );
-        return false;
-      }
-      if (toDate && actualDate > toDate) {
-        console.warn(
-          `    ❌ [${contract.contract_number}] after toDate → excluded`
-        );
-        return false;
-      }
-  
-      // If we reach here, it’s in range
+      if (!actualDate || isNaN(actualDate.getTime())) return false;
+      if (fromDate && actualDate < fromDate) return false;
+      if (toDate   && actualDate > toDate)   return false;
       return true;
     });
   
-    console.log('▶️ Contracts in-range count:', inRange.length);
-  
-    // 5) Map those to “flattened” objects for Excel
-    const cleanedContracts = inRange.map((contract) => {
-      // Destructure out big nested fields we don’t need in Excel
+    // 3) Strip out big fields & format timestamp
+    const cleaned = inRange.map(contract => {
       const {
         pdf_extracted,
         web_extracted,
@@ -279,20 +289,20 @@ const [exportTo, setExportTo] = useState('');     // e.g. "2025-06-10"
         ...keep
       } = contract;
   
-      // Convert the timestamp to "DD-MMM-YYYY"
-      const tsString = formatDate(contract.timestamp);
-  
       return {
         ...keep,
-        timestamp: tsString,
+        timestamp: formatDate(contract.timestamp),
       };
     });
   
-    // 6) Finally, create the worksheet & write file
-    const ws = XLSX.utils.json_to_sheet(cleanedContracts);
+    // 4) Generate & download the XLSX
+    const ws = XLSX.utils.json_to_sheet(cleaned);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Contracts');
-    XLSX.writeFile(wb, 'contracts.xlsx');
+    XLSX.writeFile(
+      wb,
+      `contracts_${exportFromRaw || 'start'}_${exportToRaw || 'end'}.xlsx`
+    );
   };
 
   // 1. create exportBetween(fromRaw, toRaw) helper
@@ -368,14 +378,39 @@ const exportBetween = (fromRaw, toRaw) => {
   XLSX.utils.book_append_sheet(wb, ws, 'Contracts');
   XLSX.writeFile(wb, 'contracts.xlsx');
 };
+// new state for our dropdowns
+const [tenantTypes, setTenantTypes] = useState([]);
+const [leaseTypes, setLeaseTypes] = useState([]);
+
+useEffect(() => {
+  async function fetchData() {
+    const res = await api.get('/get-compare-results');
+    const raw = res.data.data || [];
+    setContracts(raw);
+    setFilteredContracts(raw);
+    // compute unique lists
+    setTenantTypes(Array.from(new Set(raw.map(c => c.tenant_type).filter(Boolean))));
+    setLeaseTypes  (Array.from(new Set(raw.map(c => c.lease_type).filter(Boolean))));
+    computeWeeklyStats(raw);
+    // … the rest of your fetchData …
+    // build unique lists for our filters
+setTenantTypes(Array.from(
+  new Set(raw.map(c => c.tenant_type).filter(Boolean))
+));
+setLeaseTypes(Array.from(
+  new Set(raw.map(c => c.lease_type).filter(Boolean))
+));
+  }
+  fetchData();
+}, []);
 
   const handleLeadStatusChange = async (contractId, status) => {
     setLeadStatuses(prev => ({ ...prev, [contractId]: status }));
     try {
-      await axios.post('http://localhost:5001/api/update-lead-status', {
-        contractNumber: contractId.replace(/_/g, '/'),
-        leadStatus: status,
-      });
+       await api.post('/update-lead-status', {
+           contractNumber: contractId.replace(/_/g, '/'),
+           leadStatus: status,
+         });
       console.log(`[✅ Lead status for ${contractId} updated to ${status}`);
     } catch (error) {
       console.error(`[❌ Error updating lead status for ${contractId}]`, error);
@@ -384,7 +419,7 @@ const exportBetween = (fromRaw, toRaw) => {
 
   const forceProcessFile = async (contractNumber) => {
     try {
-      const res = await axios.post(`${API_URL}/api/force-process-contract`, {
+      const res = await api.post(`/force-process-contract`, {
         contractNumber
       });
   
@@ -392,11 +427,11 @@ const exportBetween = (fromRaw, toRaw) => {
         alert('✅ Forced processing complete.');
   
         // Re-fetch the latest compare results and refresh state
-        const getRes = await axios.get(`${API_URL}/api/get-compare-results`);
-        if (getRes.data.success && Array.isArray(getRes.data.data)) {
-          setContracts(getRes.data.data);
-          setFilteredContracts(getRes.data.data);
-          computeWeeklyStats(getRes.data.data);
+        const { data } = await api.get('/get-compare-results');
+        if (data.success && Array.isArray(data.data)) {
+          setContracts(data.data);
+          setFilteredContracts(data.data);
+          computeWeeklyStats(data.data);
         }
       } else {
         alert('❌ Failed to start forced process.');
@@ -407,37 +442,27 @@ const exportBetween = (fromRaw, toRaw) => {
     }
   };
 
+  
+
   const autoProcessContracts = async () => {
-    // 1) flip your busy flags
+    // Start both loading and processing flags
     setIsProcessingAuto(true);
     setLoadingAuto(true);
     setErrorAuto(null);
     setSuccessMessage(null);
   
     try {
-      // 2) trigger the single-contract flow on the server
-      //    pass your promptKey so it uses LOI_permanent_fixed_fields_compare.txt
-      const res = await axios.post(
-        `${API_URL}/api/auto-process-pdf-folder`,
-        {
-          folderPath: sharepointPath,
-          promptKey: 'LOI_permanent_fixed_fields'  
-        }
+      // Trigger backend auto-process
+      const res = await api.post(
+        `/auto-process-pdf-folder`,
+        { folderPath: sharepointPath }
       );
   
       if (res.data.success) {
         const count = res.data.processedCount || 0;
-        const msg = `✅ Auto processing complete: ${count} file(s) processed.`;
+        const msg = `✅ Auto processing started: ${count} file(s) processed.`;
         setSuccessMessage(msg);
         alert(msg);
-  
-        // 3) re-fetch your compare results so the table updates
-        const getRes = await axios.get(`${API_URL}/api/get-compare-results`);
-        if (getRes.data.success && Array.isArray(getRes.data.data)) {
-          setContracts(getRes.data.data);
-          setFilteredContracts(getRes.data.data);
-          computeWeeklyStats(getRes.data.data);
-        }
       } else {
         const errMsg = '⚠️ No new files found or nothing was processed.';
         setErrorAuto(errMsg);
@@ -446,6 +471,7 @@ const exportBetween = (fromRaw, toRaw) => {
     } catch (err) {
       console.error('[Auto Processing Error]', err);
       let errMsg;
+  
       if (!navigator.onLine) {
         errMsg = '❌ Network offline — will retry when you’re back online.';
       } else if (err.response?.status === 404) {
@@ -455,10 +481,11 @@ const exportBetween = (fromRaw, toRaw) => {
       } else {
         errMsg = `❌ Unexpected error: ${err.message}`;
       }
+  
       setErrorAuto(errMsg);
       alert(errMsg);
     } finally {
-      // 4) clear your busy flags
+      // Clear flags
       setLoadingAuto(false);
       setIsProcessingAuto(false);
     }
@@ -496,7 +523,7 @@ const handleTodaysReport = () => {
   
     // 2. Send to backend
     try {
-      await axios.post('http://localhost:5001/api/update-workflow-status', {
+      await api.post('/update-workflow-status', {
         contractNumber,
         workflowStatus: chosenStatus
       });
@@ -582,10 +609,10 @@ const getContractDate = (ts) => {
     setRefreshingContracts(prev => ({ ...prev, [contractNumber]: true }));
   
     try {
-      const { data } = await axios.post(
-        'http://localhost:5001/api/refresh-contract-status',
-        { contractNumber }
-      );
+       const { data } = await api.post(
+           '/refresh-contract-status',
+           { contractNumber }
+         );
   
       // if your API ever returns success: false, bubble it up
       if (!data.success) {
@@ -620,8 +647,24 @@ const getContractDate = (ts) => {
     }
   };
 
+
+  
   return (
     <div className={styles.dashboardWrapper}>
+      {/* File Explorer Button */}
+      <div className={styles.dashboardWrapper}>
+      {/* … existing buttons/filters … */}
+
+
+
+      {showExplorer && (
+        <FileExplorer onClose={() => setShowExplorer(false)} />
+      )}
+
+      <table className={styles.resultTable}>
+        {/* … rest of your table … */}
+      </table>
+    </div>
   {/* ─── Logout button ─────────────────────────────────────────────────── */}
   <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
     <button className={styles.logoutButton} onClick={handleLogout}>
@@ -683,22 +726,113 @@ const getContractDate = (ts) => {
     value={filters.search}
     onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
   />
-  <select onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}>
-    <option value="">Select Status</option>
-    <option value="Passed">Passed</option>
-    <option value="Needs Review">Needs Review</option>
-  </select>
-  <select onChange={e => setFilters(prev => ({ ...prev, workflowStatus: e.target.value }))}>
-    <option value="">Select Workflow Status</option>
-    <option value="Accepted">Accepted</option>
-    <option value="In Progress">In Progress</option>
-    <option value="Pending">Pending</option>
-  </select>
-  <select onChange={e => setFilters(prev => ({ ...prev, tenantType: e.target.value }))}>
-    <option value="">Select Tenant Type</option>
-    <option value="PND - PN Financial Service - ATM">PND - PN Financial Service - ATM</option>
-    <option value="Commercial">Commercial</option>
-  </select>
+{/* Status */}
+<select
+  value={filters.status}
+  onChange={e =>
+    setFilters(prev => ({ ...prev, status: e.target.value }))
+  }
+>
+  <option value="">Select Status</option>
+  <option value="Passed">Passed</option>
+  <option value="Needs Review">Needs Review</option>
+</select>
+
+{/* Workflow Status */}
+<select
+  value={filters.workflowStatus}
+  onChange={e =>
+    setFilters(prev => ({ ...prev, workflowStatus: e.target.value }))
+  }
+>
+  <option value="">Select Workflow Status</option>
+  <option value="Accepted">Accepted</option>
+  <option value="In Progress">In Progress</option>
+  <option value="Pending">Pending</option>
+</select>
+
+{/* Lease Type (multi-select) */}
+{/* ─── Lease Type Dropdown ─────────────────── */}
+{/* ─── Lease Type Dropdown ────────────────── */}
+<div className={styles.dropdownWrapper}>
+  <button
+    className={styles.dropdownToggle}
+    onClick={() => setShowLeaseDropdown(open => !open)}
+  >
+    Lease Type
+    {filters.leaseTypes.length > 0 && ` (${filters.leaseTypes.length})`}
+  </button>
+
+  {showLeaseDropdown && (
+    <div
+      className={
+        `${styles.dropdownMenu} ` +
+        `${styles.multiSelectContainer}`
+      }
+    >
+      <button
+        className={styles.clearButton}
+        onClick={() =>
+          setFilters(prev => ({ ...prev, leaseTypes: [] }))
+        }
+      >
+        Clear
+      </button>
+
+      {leaseTypes.map(type => (
+        <label key={type}>
+          <input
+            type="checkbox"
+            checked={filters.leaseTypes.includes(type)}
+            onChange={() => toggleLeaseType(type)}
+          />
+          <span>{type}</span>
+        </label>
+      ))}
+    </div>
+  )}
+</div>
+
+
+{/* ─── Tenant Type Dropdown ────────────────── */}
+<div className={styles.dropdownWrapper}>
+  <button
+    className={styles.dropdownToggle}
+    onClick={() => setShowTenantDropdown(open => !open)}
+  >
+    Tenant Type
+    {filters.tenantTypes.length > 0 && ` (${filters.tenantTypes.length})`}
+  </button>
+
+  {showTenantDropdown && (
+    <div
+      className={
+        `${styles.dropdownMenu} ` +
+        `${styles.multiSelectContainer}`
+      }
+    >
+      <button
+        className={styles.clearButton}
+        onClick={() =>
+          setFilters(prev => ({ ...prev, tenantTypes: [] }))
+        }
+      >
+        Clear
+      </button>
+
+      {tenantTypes.map(type => (
+        <label key={type}>
+          <input
+            type="checkbox"
+            checked={filters.tenantTypes.includes(type)}
+            onChange={() => toggleTenantType(type)}
+          />
+          <span>{type}</span>
+        </label>
+      ))}
+    </div>
+  )}
+</div>
 
   <select
     value={filters.leadStatus}
@@ -747,6 +881,25 @@ const getContractDate = (ts) => {
   >
     Today’s Report
   </button>
+
+  <button
+    onClick={() => setShowExplorer(true)}
+    title="Open File Explorer"
+    style={{
+      height: '2rem',
+      width: '2rem',
+      padding: 0,
+      fontSize: '2.2rem',
+      lineHeight: 1,
+      background: 'transparent',
+      border: 'none',
+      cursor: 'pointer',
+      border: 'none',
+      marginBottom: '0.5rem',
+    }}
+  >
+    📂
+  </button>
 </div>
 </div>
 
@@ -761,135 +914,116 @@ const getContractDate = (ts) => {
       <th>Tenant Type</th>
       <th>Lead Status</th>
       <th>Summary</th>
-      <th>Simplicity Link</th>
       {user?.role !== 'user' && <th>Force Process</th>}
     </tr>
   </thead>
   <tbody>
-    {filteredContracts.map((contract, idx) => {
-      const status = isValid(contract) ? '✅ Passed' : '❌ Needs Review';
-      const rowId = contract.contract_number || `row-${idx}`;
+  {(() => {
+    const activeContracts = filteredContracts.filter(
+      c => (leadStatuses[c.contract_number] || '').toLowerCase() !== 'resolved'
+    );
+    const resolvedContracts = filteredContracts.filter(
+      c => (leadStatuses[c.contract_number] || '').toLowerCase() === 'resolved'
+    );
 
-      return (
-        <React.Fragment key={rowId}>
-          <tr>
+    
 
-            <td>{contract.contract_number || '—'}</td>
-            <td>{formatDate(contract.timestamp)}</td>
-            <td>{status}</td>
-            <td>
-              {editingWorkflowFor === contract.contract_number ? (
-                <select
-                  value={contract.workflow_status || ''}
-                  onChange={e => {
-                    handleWorkflowStatusChange(contract.contract_number, e.target.value);
-                    setEditingWorkflowFor(null);
-                  }}
-                  onBlur={() => setEditingWorkflowFor(null)}
-                  autoFocus
-                  className={styles.workflowSelect}
-                >
-                  <option value="">-- select status --</option>
-                  <option value="Accepted">Accepted</option>
-                  <option value="Reject">Reject</option>
-                  <option value="Pending">Pending Verification</option>
-                  <option value="Simplify need editing">Simplify need editing</option>
-                  <option value="LOI need editing">LOI need editing</option>
-                </select>
-              ) : (
-                <>
-                  {contract.workflow_status || '—'}
-                  {refreshingContracts[contract.contract_number] ? (
-                    <span className={styles.spinner} />
-                  ) : (
-                    <button
-                      className={styles.refreshIconButton}
-                      title="Refresh Status"
-                      onClick={() => refreshContractStatus(contract.contract_number)}
+    return (
+      <>
+        {/* Active rows */}
+        {activeContracts.map((contract, idx) => {
+          const status = isValid(contract) ? '✅ Passed' : '❌ Needs Review';
+          const rowId = contract.contract_number || `row-${idx}`;
+          return (
+            <React.Fragment key={rowId}>
+              <tr>
+                <td>{contract.contract_number || '—'}</td>
+                <td>{formatDate(contract.timestamp)}</td>
+                <td>{status}</td>
+                <td>
+                  {editingWorkflowFor === contract.contract_number ? (
+                    <select
+                      value={contract.workflow_status || ''}
+                      onChange={e => {
+                        handleWorkflowStatusChange(contract.contract_number, e.target.value);
+                        setEditingWorkflowFor(null);
+                      }}
+                      onBlur={() => setEditingWorkflowFor(null)}
+                      autoFocus
+                      className={styles.workflowSelect}
                     >
-                      <RefreshCcw size={14} />
-                    </button>
+                      <option value="">-- select status --</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Reject">Reject</option>
+                      <option value="Pending">Pending Verification</option>
+                      <option value="Simplify need editing">Simplify need editing</option>
+                      <option value="LOI need editing">LOI need editing</option>
+                    </select>
+                  ) : (
+                    <>
+                      {contract.workflow_status || '—'}
+                      {refreshingContracts[contract.contract_number] ? (
+                        <span className={styles.spinner} />
+                      ) : (
+                        <button
+                          className={styles.refreshIconButton}
+                          title="Refresh Status"
+                          onClick={() => refreshContractStatus(contract.contract_number)}
+                        >
+                          <RefreshCcw size={14} />
+                        </button>
+                      )}
+                      <button
+                        className={styles.editWorkflowButton}
+                        title="Edit Workflow Status"
+                        onClick={() => setEditingWorkflowFor(contract.contract_number)}
+                      >
+                        ✏️
+                      </button>
+                    </>
                   )}
-                  <button
-                    className={styles.editWorkflowButton}
-                    title="Edit Workflow Status"
-                    onClick={() => setEditingWorkflowFor(contract.contract_number)}
+                </td>
+                <td>{contract.lease_type || '—'}</td>
+                <td>{contract.tenant_type || '—'}</td>
+                <td>
+                  <select
+                    value={leadStatuses[contract.contract_number] || ''}
+                    onChange={e => handleLeadStatusChange(contract.contract_number, e.target.value)}
+                    className={styles.leadStatusSelect}
                   >
-                    ✏️
+                    <option value="">Select Lead Status</option>
+                    <option value="Acknowledge">Acknowledge</option>
+                    <option value="In-progress">In-progress</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </td>
+                <td>
+                  <button
+                    className={styles.expandButton}
+                    onClick={() => toggleDetails(rowId)}
+                  >
+                    {expandedId === rowId ? 'Hide' : 'View Details'}
                   </button>
-                </>
-              )}
-            </td>
-            <td>{contract.lease_type || '—'}</td>
-
-            <td>{contract.tenant_type || '—'}</td>
-            <td>
-              <select
-                value={leadStatuses[contract.contract_number] || ''}
-                onChange={e => handleLeadStatusChange(contract.contract_number, e.target.value)}
-                className={styles.leadStatusSelect}
-              >
-                <option value="">Select Lead Status</option>
-                <option value="Acknowledge">Acknowledge</option>
-                <option value="In-progress">In-progress</option>
-                <option value="Resolved">Resolved</option>
-              </select>
-            </td>
-            <td>
-              <button
-                className={styles.expandButton}
-                onClick={() => toggleDetails(rowId)}
-              >
-                {expandedId === rowId ? 'Hide' : 'View Details'}
-              </button>
-            </td>
-            <td>
-              <button
-                className={styles.buttonOpenPopup}
-                onClick={() => {
-                  axios
-                    .post('http://localhost:5001/api/open-popup-tab', {
-                      systemType:      'simplicity',
-                      contractNumber:  contract.contract_number.replace(/_/g, '/'),
-                      username:        user.email,    // ← pass logged‐in email
-                      password:        user.password, // ← pass logged‐in password
-                    })
-                    .then(res => {
-                      if (res.data.success) {
-                        alert('✅ Popup opened. Please check Chrome.');
-                      } else {
-                        alert('❌ Failed to open popup.');
-                      }
-                    })
-                    .catch(err => {
-                      alert('❌ Error triggering popup tab.');
-                      console.error(err);
-                    });
-                }}
-              >
-                🧾 Open Contract Popup
-              </button>
-            </td>
-            {user?.role !== 'user' && (
-            <td>
-            <button
-              className={styles.forceProcessButton}
-              onClick={() => {
-                if (isProcessingAuto) {
-                  alert('⚠️ A process is already running. Please wait.');
-                  return;
-                }
-                forceProcessFile(contract.contract_number);
-              }}
-              disabled={isProcessingAuto}
-            >
-              🚀 Force Process
-            </button>
-            </td>
-          )}
-          </tr>
-
-          {expandedId === rowId && (
+                </td>
+                {user?.role !== 'user' && (
+                  <td>
+                    <button
+                      className={styles.forceProcessButton}
+                      onClick={() => {
+                        if (isProcessingAuto) {
+                          alert('⚠️ A process is already running. Please wait.');
+                          return;
+                        }
+                        forceProcessFile(contract.contract_number);
+                      }}
+                      disabled={isProcessingAuto}
+                    >
+                      🚀 Force Process
+                    </button>
+                  </td>
+                )}
+              </tr>
+              {expandedId === rowId && (
             <tr>
               <td colSpan={9}>
                 <div className={styles.detailsSection}>
@@ -901,6 +1035,7 @@ const getContractDate = (ts) => {
                         <th>PDF</th>
                         <th>Web</th>
                         <th>Match</th>
+                        <th>Reason</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -910,6 +1045,7 @@ const getContractDate = (ts) => {
                           <td>{row.pdf}</td>
                           <td>{row.web}</td>
                           <td>{row.match ? '✅' : '❌'}</td>
+                          <td>{row.reason || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -989,12 +1125,299 @@ const getContractDate = (ts) => {
             </tr>
           )}
         </React.Fragment>
-      );
-    })}
-  </tbody>
+          );
+        })}
+
+        {/* Segment breaker */}
+        {resolvedContracts.length > 0 && (
+          <tr className={styles.segmentBreaker}>
+            <td colSpan={user?.role !== 'user' ? 10 : 9}>
+              📌 Resolved Contracts
+            </td>
+          </tr>
+        )}
+
+        {/* Resolved rows (greyed out but fully interactive) */}
+        {resolvedContracts.map((contract, idx) => {
+          const status = isValid(contract) ? '✅ Passed' : '❌ Needs Review';
+          const rowId = contract.contract_number || `resolved-${idx}`;
+          return (
+            <React.Fragment key={rowId}>
+              <tr className={styles.resolvedRow}>
+                <td>{contract.contract_number || '—'}</td>
+                <td>{formatDate(contract.timestamp)}</td>
+                <td>{status}</td>
+                <td>
+                  {editingWorkflowFor === contract.contract_number ? (
+                    <select
+                      value={contract.workflow_status || ''}
+                      onChange={e => {
+                        handleWorkflowStatusChange(contract.contract_number, e.target.value);
+                        setEditingWorkflowFor(null);
+                      }}
+                      onBlur={() => setEditingWorkflowFor(null)}
+                      autoFocus
+                      className={styles.workflowSelect}
+                    >
+                      <option value="">-- select status --</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Reject">Reject</option>
+                      <option value="Pending">Pending Verification</option>
+                      <option value="Simplify need editing">Simplify need editing</option>
+                      <option value="LOI need editing">LOI need editing</option>
+                    </select>
+                  ) : (
+                    <>
+                      {contract.workflow_status || '—'}
+                      {refreshingContracts[contract.contract_number] ? (
+                        <span className={styles.spinner} />
+                      ) : (
+                        <button
+                          className={styles.refreshIconButton}
+                          title="Refresh Status"
+                          onClick={() => refreshContractStatus(contract.contract_number)}
+                        >
+                          <RefreshCcw size={14} />
+                        </button>
+                      )}
+                      <button
+                        className={styles.editWorkflowButton}
+                        title="Edit Workflow Status"
+                        onClick={() => setEditingWorkflowFor(contract.contract_number)}
+                      >
+                        ✏️
+                      </button>
+                    </>
+                  )}
+                </td>
+                <td>{contract.lease_type || '—'}</td>
+                <td>{contract.tenant_type || '—'}</td>
+                <td>
+                  <select
+                    value={leadStatuses[contract.contract_number] || ''}
+                    onChange={e => handleLeadStatusChange(contract.contract_number, e.target.value)}
+                    className={styles.leadStatusSelect}
+                  >
+                    <option value="">Select Lead Status</option>
+                    <option value="Acknowledge">Acknowledge</option>
+                    <option value="In-progress">In-progress</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </td>
+                <td>
+                  <button
+                    className={styles.expandButton}
+                    onClick={() => toggleDetails(rowId)}
+                  >
+                    {expandedId === rowId ? 'Hide' : 'View Details'}
+                  </button>
+                </td>
+                {user?.role !== 'user' && (
+                  <td>
+                    <button
+                      className={styles.forceProcessButton}
+                      onClick={() => {
+                        if (isProcessingAuto) {
+                          alert('⚠️ A process is already running. Please wait.');
+                          return;
+                        }
+                        forceProcessFile(contract.contract_number);
+                      }}
+                      disabled={isProcessingAuto}
+                    >
+                      🚀 Force Process
+                    </button>
+                  </td>
+                )}
+              </tr>
+              {expandedId === rowId && (
+                <tr className={styles.resolvedRow}>
+                  <td colSpan={user?.role !== 'user' ? 10 : 9}>
+                    <div className={styles.detailsSection}>
+                      {/* …details content… */}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </>
+    );
+  })()}
+</tbody>
 </table>
     </div>
   );
 }
+
+function FileExplorer({ onClose }) {
+  const [tree, setTree] = useState([]);
+  const [currentPath, setCurrentPath] = useState('');
+
+  useEffect(() => {
+    fetchTree('');
+  }, []);
+
+
+  
+  const fetchTree = async (path) => {
+    try {
+      const res = await api.get('/list-directory', { params: { path } });
+      let entries = res.data.entries;
+      // At root, only show these two folders:
+      if (path === '') {
+        entries = entries.filter(e =>
+          e.isDirectory && ['contracts', 'processed'].includes(e.name)
+        );
+      }
+      setTree(entries);
+      setCurrentPath(path);
+    } catch (err) {
+      console.error('Failed to list directory:', err);
+    }
+  };
+
+  const enter = (entry) => {
+    if (!entry.isDirectory) return;
+    const next = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+    fetchTree(next);
+  };
+
+  const downloadFile = (entry) => {
+    const filePath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+    window.open(
+      `${API_URL}/api/download-file?path=${encodeURIComponent(filePath)}`,
+      '_blank'
+    );
+  };
+
+  const downloadFolder = () => {
+    window.open(
+      `${API_URL}/api/download-folder?path=${encodeURIComponent(currentPath)}`,
+      '_blank'
+    );
+  };
+
+  // new: upload handler
+  const uploadFiles = async (e) => {
+    const files = e.target.files;
+    if (!files.length) return;
+    const form = new FormData();
+    for (let file of files) {
+      form.append('files', file);
+    }
+    try {
+      await api.post('/upload-file', form, {
+        params: { path: currentPath },
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      fetchTree(currentPath); // refresh view
+      e.target.value = ''; // reset input
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('Failed to upload files');
+    }
+  };
+
+  // new: delete handler
+  const deleteEntry = async (entry) => {
+    const target = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+    if (!window.confirm(`Delete "${entry.name}"?`)) return;
+    try {
+      await api.delete('/delete-entry', { params: { path: target } });
+      fetchTree(currentPath);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('Failed to delete entry');
+    }
+  };
+
+  // Breadcrumb segments
+  const crumbs = currentPath === ''
+    ? []
+    : currentPath.split('/').map((seg, i, arr) => ({
+        name: seg,
+        path: arr.slice(0, i + 1).join('/')
+      }));
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={styles.explorerHeader}>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <nav className={styles.breadcrumb}>
+            <span
+              className={styles.crumb}
+              onClick={() => fetchTree('')}
+            >
+              Home
+            </span>
+            {crumbs.map(c => (
+              <React.Fragment key={c.path}>
+                <span className={styles.separator}>/</span>
+                <span
+                  className={styles.crumb}
+                  onClick={() => fetchTree(c.path)}
+                >
+                  {c.name}
+                </span>
+              </React.Fragment>
+            ))}
+          </nav>
+          <button
+            className={styles.downloadFolderBtn}
+            onClick={downloadFolder}
+          >
+            ↓ Download Folder
+          </button>
+          {/* new: upload button */}
+          <label className={styles.uploadLabel}>
+            ↑ Upload
+            <input
+              type="file"
+              multiple
+              onChange={uploadFiles}
+              className={styles.uploadInput}
+            />
+          </label>
+        </div>
+
+        {/* File/Folder List */}
+        <ul className={styles.fileList}>
+          {tree.map(entry => (
+            <li
+              key={entry.name}
+              className={entry.isDirectory ? styles.dirItem : styles.fileItem}
+              onDoubleClick={() =>
+                entry.isDirectory ? enter(entry) : downloadFile(entry)
+              }
+            >
+              {entry.isDirectory ? '📁' : '📄'} {entry.name}
+              <div className={styles.entryActions}>
+                {!entry.isDirectory && (
+                  <button
+                    className={styles.downloadBtn}
+                    onClick={e => { e.stopPropagation(); downloadFile(entry); }}
+                  >
+                    ↓
+                  </button>
+                )}
+                <button
+                  className={styles.deleteBtn}
+                  onClick={e => { e.stopPropagation(); deleteEntry(entry); }}
+                >
+                  🗑️
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 
 export default LOIDashboard;

@@ -1,0 +1,69 @@
+Compare lease terms between PDF and Web sources. Return JSON array of comparison results.
+
+**INTELLIGENT DATE COMPARISON:**
+When comparing dates, MUST handle different calendar systems and formats:
+
+- Thai Buddhist dates (e.g., "30 มิถุนายน 2570") = Gregorian dates - 543 years
+- Convert Buddhist years to Gregorian: 2570 - 543 = 2027
+- "30 มิถุนายน 2570" = "30-Jun-2027" = EXACT MATCH
+- Compare actual calendar dates, not text format
+- Account for different date formats: "DD-MMM-YYYY", "DD/MM/YYYY", Thai Buddhist format
+
+**CRITICAL**: If dates represent the same calendar date after conversion, set "match": true regardless of format differences
+
+Compare these fields:
+
+"Lease Type" - Check "4. ค่าเช่าและบริการ" for payment condition "Permanent Fixed" vs other
+
+"Billing Frequency" - If contract number contains "LR": mark as Match if Web info is NULL, otherwise compare normally
+
+"Monthly charge" - Output "Yes" or "No" comparison
+
+For Year-by-Year comparisons, interpret dates and amounts:
+
+"Year 1 : Contract Start date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 1 : Contract End date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 1 : Charge Type" - Compare meaning: both fixed rate OR both variable rate = match
+"Year 1 : Monthly Amount of rent" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated (e.g., 101.4024 * area ≈ 9,937.44)
+"Year 1 : Monthly Amount of service" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated
+
+"Year 2 : Contract Start date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 2 : Contract End date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 2 : Charge Type" - Compare meaning: both fixed rate OR both variable rate = match  
+"Year 2 : Monthly Amount of rent" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated
+"Year 2 : Monthly Amount of service" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated
+
+"Year 3 : Contract Start date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 3 : Contract End date" - **SMART DATE COMPARISON:** Convert Thai Buddhist to Gregorian, set "match": true if same calendar date, "match": false if different dates
+"Year 3 : Charge Type" - Compare meaning: both fixed rate OR both variable rate = match
+"Year 3 : Monthly Amount of rent" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated
+"Year 3 : Monthly Amount of service" - **SMART AMOUNT COMPARISON:** Match if same amount OR if one appears to be per-sqm rate that equals the other when calculated
+
+"Total Rent Deposits" - Compare numeric amounts
+"Total Service Deposits" - Compare numeric amounts
+
+**EXAMPLE DATE CONVERSIONS:**
+- "30 มิถุนายน 2570" vs "30-Jun-2027" → Same calendar date → "match": true ✅
+- "1 กรกฎาคม 2568" vs "01-Jul-2025" → Same calendar date → "match": true ✅  
+- "15 มกราคม 2570" vs "16-Jan-2027" → Different calendar dates → "match": false ❌
+- Handle Thai months: มกราคม=Jan, กุมภาพันธ์=Feb, มีนาคม=Mar, เมษายน=Apr, พฤษภาคม=May, มิถุนายน=Jun, กรกฎาคม=Jul, สิงหาคม=Aug, กันยายน=Sep, ตุลาคม=Oct, พฤศจิกายน=Nov, ธันวาคม=Dec
+
+**EXAMPLE MATCH OUTPUT:**
+{
+  "field": "Year 1 : Contract Start date", 
+  "pdf": "01 กรกฎาคม 2568",
+  "web": "01-Jul-2025", 
+  "match": true,
+  "reason": "PDF Buddhist date 01 กรกฎาคม 2568 converts to 01-Jul-2025, matches Web date exactly"
+}
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation of comparison logic (mention calendar conversion if applicable)"
+  }
+]

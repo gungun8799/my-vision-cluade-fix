@@ -1,8 +1,0 @@
-Extract key fields from the following webpage content and return these fields in JSON format
-  "Contract Number",
-  "Customer Brand",
-  "Contract Start Date",
-  "Contract End Date",
-  "Payment Terms",
-  "Total Amount",
-  "Termination Clause"

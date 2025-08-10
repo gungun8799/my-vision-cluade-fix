@@ -1,0 +1,32 @@
+Validate business rules for SERVICE EXPRESS contracts from WEB scraped data. Return JSON array of validation results.
+
+Web-specific business rule validation (only validate fields that exist in web data):
+
+"Space Design Type" - **LR SKIP RULE:** If contract contains "LR": always valid "LR contract - Space Design Type validation skipped". Otherwise: Contextual match with "Tenant Type" value. The Space Design Type should match the tenant category from web data by context, allowing for different formats. Examples: "PNL2 - PN Local - Health & Beauty" should match "PN Local - Health & Beauty", or "PN Local - Health & Beauty" should match both. Focus on the meaningful tenant category part, ignoring prefixes like codes. If no contextual match: invalid "Space Design Type ('<value>') does not contextually match Tenant Type ('<Tenant Type>')". If match found: valid "Space Design Type contextually matches Tenant Type"
+
+"Building ID" - Validate 4-digit format from web source
+
+"อยู่กองทรัสต์หรือไม่" - Cross-reference with Building ID from web data (if starts with "00" = "Yes")
+
+"Customer Type" - Validate Individual vs Corporate from web customer information (if available)
+
+"Lease Dates" - Validate lease dates are future-dated and logical (if available)
+
+**WEB-SPECIFIC BUSINESS RULES:**
+- Only validate fields that are actually present in the web data
+- Skip validation for fields that are not available in web sources
+- Focus on data consistency and format validation
+
+**LO/LR BUSINESS VARIATIONS:**
+- **LR CONTRACT RULE**: Renewal contracts may have relaxed validation on certain business rules
+- **LO CONTRACT RULE**: New lease offers require stricter business rule validation
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "value": "Web extracted value",
+    "valid": true or false,
+    "reason": "Web business rule explanation"
+  }
+]

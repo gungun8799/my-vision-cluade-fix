@@ -1,0 +1,23 @@
+Compare tax and deposit information between PDF and Web sources. Return JSON array of comparison results.
+
+Compare these fields:
+
+"Lease property tax" - always mark as match True. 
+
+"Deposits Amount" - Mark as "Valid" if numbers are the same, ignore decimal points
+
+Validation Logic:
+- For tax rates, exact matching is required based on web value type
+- For deposits, numeric equivalence (ignoring decimal formatting)
+- Missing values in either source = false match
+
+Return format:
+[
+  {
+    "field": "Field name", 
+    "pdf": "PDF value",
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Tax rule applied OR deposit comparison result"
+  }
+]

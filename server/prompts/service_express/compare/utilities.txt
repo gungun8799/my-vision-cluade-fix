@@ -1,0 +1,36 @@
+Compare utility information between PDF and Web sources for SERVICE EXPRESS contracts. Return JSON array of comparison results.
+
+Compare these fields:
+
+"Include Utility" - **SPECIAL SERVICE EXPRESS LOGIC**:
+• **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match regardless of values
+• **SERVICE EXPRESS RULE**: Compare based on utility charges aggregation:
+  - Should be "Yes" if ANY of the three utility charges > 0
+  - Should be "No" if ALL three utility charges are 0.00 or missing
+• **LO/LR NEUTRAL**: Apply same logic for both LO and LR contracts
+
+"Utilities charge (water)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts
+
+"Utilities charge (Electricity)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts  
+
+"Utilities charge (cooking gas)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts
+
+Special Trust Fund Rules:
+- If "อยู่กองทรัสต์หรือไม่" = "Yes", all utility fields automatically match regardless of values
+- This overrides normal comparison logic for utility-related fields
+
+Service Express Comparison Logic:
+- Compare numeric values for utility charges
+- "Include Utility" comparison follows Service Express aggregation rules
+- Focus on whether the utility inclusion logic is correctly applied
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "pdf": "PDF value",
+    "web": "Web value",
+    "match": true or false, 
+    "reason": "Trust fund override OR Service Express logic explanation"
+  }
+]

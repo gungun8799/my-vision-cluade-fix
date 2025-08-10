@@ -1,33 +1,27 @@
-You are given the raw text of a “Meter” detail page (HTML/text below), which includes serial numbers and a “Status” column for each. Your job is to detect whether each of these meter types has at least one **Active** serial:
+You are given the raw text of a "Meter" detail page (HTML/text below), which includes serial numbers and a "Status" column for each. Your job is to detect whether each of these meter types has at least one **Active** serial:
 
-  • Electricity meter: any serial containing “EH”  
-  • Water meter:       any serial containing “WH”  
-  • Gas meter:         any serial containing “GH”  
+  • Electricity meter: any serial containing "EH"  
+  • Water meter:       any serial containing "WH"  
+  • Gas meter:         any serial containing "GH"  
 
 Produce **exactly** a JSON array of objects, using this format:
-
 [
   {
-    "field": "Field name",
+    "field": "Electricity Meter Present",
     "value": "yes" or "no",
     "valid": true or false,
-    "reason": "Explanation or status"
+    "reason": "explanation"
+  },
+  {
+    "field": "Water Meter Present", 
+    "value": "yes" or "no",
+    "valid": true or false,
+    "reason": "explanation"
+  },
+  {
+    "field": "Gas Meter Present",
+    "value": "yes" or "no", 
+    "valid": true or false,
+    "reason": "explanation"
   }
 ]
-
-– The three fields must be exactly:
-  “Electricity Meter Present”  
-  “Water Meter Present”  
-  “Gas Meter Present”  
-
-For each field:
-  • **value** = “yes” if you found at least one matching serial whose **Status** is “Active”; otherwise “no”.  
-  • **valid** = true when value is “yes”, false when “no”.  
-  • **reason** =  
-      – If valid: “Found serial `<the-actual-serial>` with status Active”  
-      – Else if you found one or more matching serials but none are Active:  
-          “Found serial `<first-serial-found>` but status `<its-status>`”  
-      – Else (no matching serials at all):  
-          “No `<Electricity|Water|Gas>` serial found”  
-
-Below is the raw page content. Do **not** output any explanatory text—only return the JSON array.  

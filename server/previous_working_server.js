@@ -19,22 +19,6 @@ import { dirname } from 'path';
 const fsPromises = fs.promises;      // define fsPromises
 // …or just use fs.promises inline below
 
-// ===== UTILITY FUNCTION TO STRIP THINK TAGS =====
-function stripThinkTags(response) {
-  if (!response || typeof response !== 'string') {
-    return response;
-  }
-  
-  // Remove everything between <think> and </think> tags (including the tags themselves)
-  // This handles both single-line and multi-line thinking sections
-  let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  
-  // Also handle unclosed think tags - remove from <think> to end of response
-  cleaned = cleaned.replace(/<think>[\s\S]*$/gi, '');
-  
-  return cleaned.trim();
-}
-
 
 const FOLDER_PATH = path.join(process.cwd(), 'contracts');
 const storage = multer.diskStorage({
@@ -152,8 +136,6 @@ app.post('/api/process-pdf', async (req, res) => {
     // Open Puppeteer and navigate to the extraction page
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
-    page.setDefaultTimeout(0); // Disable all timeouts
-    page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
 
     // Navigate to the page containing the file extraction feature
     await page.goto('http://localhost:5001/extract-pdf'); // Adjust URL as needed
@@ -278,8 +260,7 @@ app.post('/api/extract-text-only', upload.single('file'), async (req, res) => {
 app.post('/api/extract-text', upload.array('files'), async (req, res) => {
   console.log('Incoming request to /api/extract-text');
   const files = req.files;
-  const promptKey = req.body.promptKey || req.body.contractType || 'permanent_fixed';
-  const contractType = req.body.contractType || (req.body.promptKey?.includes('service_express') ? 'service_express' : 'permanent_fixed');
+  const promptKey = req.body.promptKey || 'LOI_permanent_fixed_fields';
   const selectedPagesRaw = req.body.pages || 'all';
   const selectedPages = selectedPagesRaw.toLowerCase() === 'all'
     ? []
@@ -290,16 +271,11 @@ app.post('/api/extract-text', upload.array('files'), async (req, res) => {
     return res.status(400).json({ message: 'No files uploaded' });
   }
 
-  // Use PromptManager to get legacy-compatible prompt
-  const promptManager = new PromptManager();
-  let promptTemplate;
-  try {
-    promptTemplate = promptManager.createLegacyExtractionPrompt(contractType);
-    console.log(`[✅ Loaded modular extraction prompt for ${contractType}]`);
-  } catch (err) {
-    console.error('[❌ Failed to load extraction prompt]', err);
-    return res.status(400).json({ message: 'Failed to load extraction prompt', error: err.message });
+  const promptFilePath = path.join(__dirname, 'prompts', `${promptKey}.txt`);
+  if (!fs.existsSync(promptFilePath)) {
+    return res.status(400).json({ message: `Prompt template '${promptKey}' not found.` });
   }
+  const promptTemplate = fs.readFileSync(promptFilePath, 'utf8');
 
   let combinedText = '';
 
@@ -358,132 +334,27 @@ app.post('/api/extract-text', upload.array('files'), async (req, res) => {
 
   // === Gemini Processing ===
   const finalPrompt = `${promptTemplate}\n\nText:\n${combinedText}`;
-  
-  let geminiText;
-  const maxRetries = 3;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const geminiRes = await model.generateContent({
-        contents: [{ parts: [{ text: finalPrompt }] }],
-        generationConfig: {
-          temperature: 0.1,        // 🔽 Lower = less hallucination
-          topK: 1,
-          topP: 0.8,
-          maxOutputTokens: 5000
-        }
-      });
-      geminiText = await geminiRes.response.text();
-      
-      // Strip think tags first
-      geminiText = stripThinkTags(geminiText);
-      
-      // Check if response is JSON-like
-      if (geminiText && !geminiText.trim().includes('{') && !geminiText.trim().includes('[')) {
-        console.error('[⚠️ Gemini returned plain text instead of JSON, retrying...]');
-        console.error('[📝 Response preview]:', geminiText.substring(0, 200));
-        
-        if (attempt === maxRetries) {
-          throw new Error('Gemini consistently returning plain text instead of JSON');
-        }
-        
-        // Add explicit JSON instruction to prompt for retry
-        const retryPrompt = `${finalPrompt}\n\nIMPORTANT: Return ONLY valid JSON format, no explanatory text.`;
-        const retryRes = await model.generateContent({
-          contents: [{ parts: [{ text: retryPrompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 0.8,
-            maxOutputTokens: 5000
-          }
-        });
-        geminiText = stripThinkTags(await retryRes.response.text());
-      }
-      
-      console.log('[✅ PDF extraction Gemini API call successful]');
-      break;
-    } catch (fetchError) {
-      console.warn(`[⚠️ PDF extraction attempt ${attempt}/${maxRetries} failed]`, fetchError.message);
-      
-      if (attempt === maxRetries) {
-        console.error('[❌ All PDF extraction attempts failed]');
-        throw new Error(`PDF extraction Gemini API failed after ${maxRetries} attempts: ${fetchError.message}`);
-      }
-      
-      // Wait before retry (exponential backoff)
-      const waitTime = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-      console.log(`[⏳ PDF extraction waiting ${waitTime}ms before retry...]`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
+  const geminiRes = await model.generateContent({
+  contents: [{ parts: [{ text: finalPrompt }] }],
+  generationConfig: {
+    temperature: 0.1,        // 🔽 Lower = less hallucination
+    topK: 1,
+    topP: 0.8,
+    maxOutputTokens: 5000
   }
+});
+  const geminiText = await geminiRes.response.text();
 
   // === Extract contract number ===
   let docId = 'unknown';
   try {
-    // Use robust JSON cleaning similar to autoProcessor.js
-    const cleaned = cleanGeminiJson(geminiText);
+    const cleaned = geminiText.trim().replace(/^```json\s*/i, '').replace(/```$/, '').trim();
     const parsed = JSON.parse(cleaned);
     if (parsed["Contract Number"]) {
       docId = parsed["Contract Number"].trim().replace(/\//g, '_');
     }
   } catch (err) {
     console.warn('[Firestore Save] Failed to extract contract number:', err.message);
-  }
-
-  // Helper function for cleaning Gemini JSON responses
-  function cleanGeminiJson(raw) {
-    try {
-      if (!raw) return '{}';
-  
-      let cleaned = raw.trim();
-      
-      // Check for multiple JSON blocks pattern
-      const jsonBlockPattern = /```json\s*(\{[\s\S]*?\})\s*```/gi;
-      const matches = [...cleaned.matchAll(jsonBlockPattern)];
-      
-      if (matches.length > 1) {
-        console.log(`[🔍 Detected ${matches.length} JSON blocks, merging them]`);
-        
-        // Merge multiple JSON objects into one
-        let mergedObject = {};
-        
-        for (const match of matches) {
-          try {
-            const jsonStr = match[1].trim();
-            const parsedBlock = JSON.parse(jsonStr);
-            
-            // Merge this block into the main object
-            mergedObject = { ...mergedObject, ...parsedBlock };
-          } catch (blockErr) {
-            console.warn('[⚠️ Failed to parse individual JSON block]', blockErr.message);
-          }
-        }
-        
-        return JSON.stringify(mergedObject);
-      }
-  
-      // Single block processing (existing logic)
-      // Remove Markdown triple backticks and optional 'json' hint
-      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/g, '');
-  
-      // Remove invalid control characters
-      cleaned = cleaned.replace(/[\u0000-\u001F\u007F]/g, '');
-  
-      // Normalize smart quotes to standard quotes
-      cleaned = cleaned.replace(/[""]/g, '"').replace(/['']/g, "'");
-  
-      // Escape lone backslashes (those not followed by escape characters)
-      cleaned = cleaned.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-  
-      // Remove trailing commas before closing braces/brackets
-      cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-  
-      return cleaned;
-    } catch (err) {
-      console.error('[cleanGeminiJson] ERROR:', err.message);
-      return raw;
-    }
   }
 
   // === Save to Firebase ===
@@ -496,453 +367,6 @@ app.post('/api/extract-text', upload.array('files'), async (req, res) => {
 
   console.log(`[📤 Firebase] Document saved as ID: ${docId}`);
   res.json({ success: true, text: combinedText, geminiOutput: geminiText });
-});
-
-// ===== NEW SEQUENTIAL PROCESSING ENDPOINTS =====
-
-// Initialize sequential processor
-const sequentialProcessor = new SequentialProcessor();
-
-// Sequential text extraction endpoint
-app.post('/api/extract-text-sequential', upload.array('files'), async (req, res) => {
-  console.log('Incoming request to /api/extract-text-sequential');
-  const files = req.files;
-  const contractType = req.body.contractType || 'permanent_fixed';
-  const selectedPagesRaw = req.body.pages || 'all';
-  const selectedPages = selectedPagesRaw.toLowerCase() === 'all'
-    ? []
-    : selectedPagesRaw.split(',').map(p => parseInt(p.trim(), 10)).filter(p => !isNaN(p));
-
-  if (!files || files.length === 0) {
-    return res.status(400).json({ message: 'No files uploaded' });
-  }
-
-  let combinedText = '';
-
-  // OCR processing (using the same GCS-based approach as working legacy endpoint)
-  for (const file of files) {
-    try {
-      console.log(`[Sequential OCR] Processing file: ${file.originalname}, path: ${file.path}`);
-      
-      const ext = path.extname(file.originalname).toLowerCase();
-      const localFilePath = path.join(__dirname, file.path);
-      const gcsPath = `uploaded/${file.originalname}`;
-      
-      // Upload to GCS first (same as legacy endpoint)
-      await bucket.upload(localFilePath, { destination: gcsPath });
-      const gcsUri = `gs://${bucket.name}/${gcsPath}`;
-      console.log(`[Sequential OCR] Uploaded to GCS: ${gcsUri}`);
-      
-      if (ext === '.pdf') {
-        // Use the same batch processing approach as legacy endpoint for PDFs
-        const outputPrefix = `vision-output/${path.parse(file.originalname).name}_${Date.now()}/`;
-        
-        const request = {
-          inputConfig: {
-            gcsSource: { uri: gcsUri },
-            mimeType: 'application/pdf',
-          },
-          outputConfig: {
-            gcsDestination: { uri: `gs://${bucket.name}/${outputPrefix}` },
-            batchSize: 5,
-          },
-          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-        };
-        if (selectedPages.length > 0) request.pages = selectedPages;
-
-        console.log('[Sequential OCR] Starting asyncBatchAnnotateFiles...');
-        const [operation] = await visionClient.asyncBatchAnnotateFiles({ requests: [request] });
-        await operation.promise();
-        console.log('[Sequential OCR] asyncBatchAnnotateFiles completed');
-
-        const [outputFiles] = await bucket.getFiles({ prefix: outputPrefix });
-        for (const outputFile of outputFiles) {
-          const [content] = await outputFile.download();
-          const result = JSON.parse(content.toString());
-          result.responses?.forEach((response, i) => {
-            const page = response.fullTextAnnotation;
-            if (page?.text) {
-              const text = page.text;
-              combinedText += `\n\nFile: ${file.originalname} — Page ${i + 1}\n${text}`;
-            }
-          });
-        }
-      } else {
-        // For non-PDF files, use direct document text detection
-        const [result] = await visionClient.documentTextDetection(localFilePath);
-        const text = result.fullTextAnnotation?.text || '';
-        combinedText += `\n\nFile: ${file.originalname}\n${text}`;
-      }
-      
-      console.log(`[Sequential OCR] Text extracted from ${file.originalname}: ${combinedText.length - (combinedText.lastIndexOf(`File: ${file.originalname}`) || 0)} characters`);
-      
-    } catch (visionError) {
-      console.error(`[❌ Sequential OCR Error] ${file.originalname}:`, visionError);
-      return res.status(500).json({ message: 'OCR processing failed', error: visionError.message });
-    }
-
-    // Clean up local file
-    fs.unlinkSync(file.path);
-  }
-
-  if (!combinedText.trim()) {
-    console.error('[Sequential] No text extracted from uploaded files');
-    return res.status(400).json({ message: 'No text extracted from uploaded files' });
-  }
-
-  console.log(`[Sequential] Total combined text length: ${combinedText.length}`);
-
-  try {
-    // Use sequential processing
-    console.log(`[Sequential] Starting sequential processing for contract type: ${contractType}`);
-    const extractedData = await sequentialProcessor.processSequential(combinedText, contractType, 'pdf');
-    
-    console.log(`[Sequential] Extracted ${Object.keys(extractedData).length} fields`);
-    console.log(`[Sequential] Available fields: ${Object.keys(extractedData).slice(0, 5).join(', ')}...`);
-    
-    // Save to Firebase (using combined result as JSON string)
-    const contractNumber = extractedData['Contract Number'] || extractedData['Contract number'] || 'unknown';
-    const docId = typeof contractNumber === 'string' ? contractNumber.replace(/\//g, '_') : 'unknown';
-    await db.collection('vision_results').doc(docId).set({
-      timestamp: new Date(),
-      extracted_text: combinedText,
-      gemini_response: JSON.stringify(extractedData, null, 2),
-      prompt_key: `sequential_${contractType}`,
-      processing_method: 'sequential'
-    });
-
-    console.log(`[📤 Firebase] Sequential processing saved as ID: ${docId}`);
-    res.json({ 
-      success: true, 
-      text: combinedText, 
-      geminiOutput: JSON.stringify(extractedData, null, 2),
-      extractedData: extractedData,
-      processingMethod: 'sequential'
-    });
-
-  } catch (err) {
-    console.error('[❌ Sequential Processing Error]', err);
-    res.status(500).json({ message: 'Sequential processing failed', error: err.message });
-  }
-});
-
-// Sequential validation endpoint
-app.post('/api/validate-sequential', async (req, res) => {
-  try {
-    const { extractedData, contractType, contractNumber, sourceType = 'pdf' } = req.body;
-
-    if (!extractedData || typeof extractedData !== 'object') {
-      return res.status(400).json({ message: 'Invalid extractedData' });
-    }
-
-    console.log(`[Sequential Validation] Processing ${sourceType.toUpperCase()} validation for ${contractType || 'unknown'} contract: ${contractNumber || 'unknown'}`);
-    const validationResults = await sequentialProcessor.processValidation(extractedData, contractType, contractNumber, sourceType);
-    
-    res.json({
-      success: true,
-      validation: validationResults,
-      processingMethod: 'sequential'
-    });
-
-  } catch (err) {
-    console.error('[❌ Sequential Validation Error]', err);
-    res.status(500).json({ message: 'Sequential validation failed', error: err.message });
-  }
-});
-
-// Sequential comparison endpoint
-app.post('/api/compare-sequential', async (req, res) => {
-  try {
-    const { pdfData, webData, contractType, contractNumber } = req.body;
-
-    if (!pdfData || !webData) {
-      return res.status(400).json({ message: 'Missing pdfData or webData' });
-    }
-
-    console.log(`[Sequential Comparison] Processing ${contractType || 'unknown'} contract: ${contractNumber || 'unknown'}`);
-    const comparisonResults = await sequentialProcessor.processComparison(pdfData, webData, contractType, contractNumber);
-    
-    res.json({
-      success: true,
-      comparison: comparisonResults,
-      processingMethod: 'sequential'
-    });
-
-  } catch (err) {
-    console.error('[❌ Sequential Comparison Error]', err);
-    res.status(500).json({ message: 'Sequential comparison failed', error: err.message });
-  }
-});
-
-// Sequential web scraping endpoint
-app.post('/api/scrape-url-sequential', async (req, res) => {
-  console.log('[Sequential] Incoming request to /api/scrape-url-sequential');
-  const { systemType = 'simplicity', contractType = 'permanent_fixed', contractNumber } = req.body;
-
-  if (!contractNumber) {
-    return res.status(400).json({ success: false, message: 'Contract number required' });
-  }
-
-  let browser;
-  let scrapedText = '';
-
-  try {
-    // Reuse existing browser session or create new one
-    if (browserSessions.has(systemType)) {
-      const session = browserSessions.get(systemType);
-      
-      // Validate that session is still connected and functional
-      try {
-        if (!session || !session.browser || typeof session.browser.pages !== 'function') {
-          throw new Error('Browser session invalid or missing pages method');
-        }
-        await session.browser.pages(); // Test if browser is still valid
-        browser = session.browser;
-      } catch (browserError) {
-        console.warn('[Sequential Web] Existing browser session invalid, creating new one:', browserError.message);
-        try {
-          if (session && session.browser) {
-            await session.browser.close();
-          }
-        } catch (closeError) {
-          // Ignore close errors
-        }
-        browserSessions.delete(systemType);
-        browser = await puppeteer.launch({ headless: false });
-        const page = await browser.newPage();
-        page.setDefaultTimeout(0); // Disable all timeouts
-        page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
-        browserSessions.set(systemType, { browser, page });
-      }
-    } else {
-      browser = await puppeteer.launch({ headless: false });
-      const page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
-      browserSessions.set(systemType, { browser, page });
-    }
-
-    const pages = await browser.pages();
-    let popup = pages.find(page => page.url().includes('simplicity'));
-    
-    if (!popup) {
-      console.log('[Sequential Web] No existing Simplicity page found, please login first');
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No active Simplicity session found. Please login first via /api/scrape-login' 
-      });
-    }
-
-    // Navigate and scrape (reusing existing logic)
-    const searchUrl = `https://simplicity.lotuss.com/module/lease/offer/view_lease_offer_detail.php?search_data=${contractNumber}`;
-    await popup.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 0 });
-    
-    scrapedText = await popup.evaluate(() => document.body.innerText);
-    console.log('[Sequential Web] Scraped content length:', scrapedText.length);
-
-    // Use sequential processing for web data
-    const extractedData = await sequentialProcessor.processSequential(scrapedText, contractType, 'web');
-    
-    // ─── METER CHECK for Sequential Processing ─────────────────
-    let utilityRaw = null;
-    let meterValidation = null;
-
-    // Debug the Include Utility field
-    console.log('[Sequential Utility Debug] extractedData["Include Utility"]:', extractedData['Include Utility']);
-    console.log('[Sequential Utility Debug] contractNumber:', contractNumber);
-    console.log('[Sequential Utility Debug] contractNumber.includes("LO"):', contractNumber.includes('LO'));
-    
-    // Check for variations in utility field name and value
-    const utilityValue = extractedData['Include Utility'] || extractedData['Utility'] || extractedData['Include utility'];
-    const isUtilityYes = utilityValue && (utilityValue.toLowerCase() === 'yes' || utilityValue.toLowerCase().includes('yes'));
-    
-    console.log('[Sequential Utility Debug] utilityValue (normalized):', utilityValue);
-    console.log('[Sequential Utility Debug] isUtilityYes:', isUtilityYes);
-    
-    if (isUtilityYes && contractNumber.includes('LO')) {
-      console.log('[Sequential Utility] Include Utility=Yes & LO… → scraping Meter…');
-
-      try {
-        // Navigate to meter page
-        await popup.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        console.log('[Sequential Utility] scrolled down');
-        await new Promise(r => setTimeout(r, 2000));
-
-        // Click Utilities top-menu
-        const utilSel = '#menu_MenuLiteralDiv > ul > li:nth-child(22) > a > div.cssmenu-item-label';
-        console.log('[Sequential Utility] clicking Utilities top-menu');
-        await popup.waitForSelector(utilSel, { visible: true, timeout: 20000 });
-        await popup.click(utilSel);
-
-        // Hover to expand submenu
-        console.log('[Sequential Utility] hovering Utilities submenu');
-        await popup.evaluate(() => {
-          const li = document.querySelector('#menu_MenuLiteralDiv > ul > li:nth-child(22)');
-          li?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-        });
-        await new Promise(r => setTimeout(r, 10000));
-
-        // Click "Meter" submenu
-        console.log('[Sequential Utility] clicking Meter submenu');
-        const clickedMeter = await popup.evaluate(() => {
-          const menu = document.querySelector('#menu_MenuLiteralDiv > ul > li:nth-child(25) ul');
-          if (!menu) return false;
-          const a = Array.from(menu.querySelectorAll('a'))
-            .find(x => x.textContent.trim() === 'Meter');
-          if (a) { a.click(); return true; }
-          return false;
-        });
-        if (!clickedMeter) throw new Error('Could not click Meter submenu');
-        console.log('[Sequential Utility] Meter submenu clicked');
-
-        // Wait & switch to bottom iframe
-        await new Promise(r => setTimeout(r, 10000));
-        const frameHandle = await popup.waitForSelector('iframe[name="frameBottom"]', { timeout: 20000 });
-        const frame = await frameHandle.contentFrame();
-       
-        await new Promise(r => setTimeout(r, 10000));
-
-        // Combined Unit ID + Building ID search
-        console.log('[Sequential Utility] preparing combined Unit ID + Building ID search');
-
-        // Wait for the main search box
-        await frame.waitForSelector('#panel_SimpleSearch_c1', { visible: true, timeout: 20000 });
-
-        // Get Building ID from extracted data 
-        const buildingId = extractedData['Building ID'] || '';
-        console.log('[Sequential Utility] fetched Building ID:', buildingId);
-
-        // Build the combined search string
-        const unitId = extractedData['Unit ID'] || '';
-        const combinedSearch = buildingId ? `${unitId} ${buildingId}` : unitId;
-
-        console.log('[Sequential Utility] entering combined search:', combinedSearch);
-
-        // Clear & type the combined string
-        await frame.click('#panel_SimpleSearch_c1', { clickCount: 3 });
-        await frame.type('#panel_SimpleSearch_c1', combinedSearch, { delay: 50 });
-
-        // Click the initial Search button
-        console.log('[Sequential Utility] clicking Search');
-        await frame.evaluate(() => {
-          const btn = document.querySelector('a#panel_buttonSearch_bt');
-          btn?.click();
-        });
-        await new Promise(r => setTimeout(r, 15000));
-
-        // Scrape meter page content
-        utilityRaw = await frame.evaluate(() => document.body.innerText);
-        console.log('[Sequentsial Utility] scraped raw after combined search:', utilityRaw);
-
-        // Run meter validation using Lotus LLM
-        const meterPromptPath = path.join(__dirname, 'prompts', 'meter_check.txt');
-        if (fs.existsSync(meterPromptPath)) {
-          const meterTemplate = fs.readFileSync(meterPromptPath, 'utf8');
-          const meterPrompt = `${meterTemplate}\n\nMeter page content:\n${utilityRaw}`;
-          console.log('[Sequential Meter Validation] sending to Lotus LLM');
-          
-          // Use Lotus LLM API for meter validation
-          const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-          const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
-          
-          const response = await axios.post(LOTUS_LLM_URL, {
-            model: 'default',
-            messages: [
-              {
-                role: 'user',
-                content: meterPrompt
-              }
-            ],
-            temperature: 0.1,
-            max_tokens: 2000
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${LOTUS_API_KEY}`
-            },
-            timeout: 0 // No timeout - wait indefinitely
-          });
-
-          const meterResponse = response.data.choices[0].message.content.trim();
-          console.log('[Sequential Meter Validation] Lotus LLM response:', meterResponse);
-
-          try {
-            meterValidation = JSON.parse(meterResponse);
-            console.log('[Sequential Meter Validation] parsed successfully');
-          } catch (parseErr) {
-            console.error('[Sequential Meter Validation] parse error:', parseErr.message);
-            meterValidation = [{ field: 'Meter Check', value: 'Error', valid: false, reason: 'Failed to parse meter validation response' }];
-          }
-        }
-
-      } catch (meterErr) {
-        console.error('[Sequential Utility] Error during meter scraping:', meterErr.message);
-        meterValidation = [{ field: 'Meter Check', value: 'Error', valid: false, reason: `Meter scraping failed: ${meterErr.message}` }];
-      }
-    } else {
-      console.log('[Sequential Utility] Skipping meter check - Include Utility not Yes or not LO contract');
-    }
-    
-    // Save to Firebase (including meter validation if available)
-    const contractId = contractNumber.replace(/\//g, '_');
-    const saveData = {
-      timestamp: new Date(),
-      contract_number: contractId,
-      web_extracted: scrapedText,
-      gemini_output: JSON.stringify(extractedData, null, 2),
-      processing_method: 'sequential',
-      popup_url: popup.url()
-    };
-    
-    if (meterValidation) {
-      saveData.meter_validation = JSON.stringify(meterValidation, null, 2);
-      saveData.utility_raw = utilityRaw;
-    }
-    
-    await db.collection('web_scrape_results').doc(contractId).set(saveData, { merge: true });
-
-    console.log('[Sequential Web] Processing complete');
-    const responseData = {
-      success: true,
-      raw: scrapedText,
-      geminiOutput: JSON.stringify(extractedData, null, 2),
-      extractedData: extractedData,
-      processingMethod: 'sequential',
-      popupUrl: popup.url()
-    };
-    
-    if (meterValidation) {
-      responseData.meterValidation = meterValidation;
-      responseData.utilityRaw = utilityRaw;
-    }
-    
-    res.json(responseData);
-
-  } catch (err) {
-    console.error('[Sequential Web] Error:', err);
-    
-    // Fallback to legacy processing
-    console.log('[Sequential Web] Falling back to legacy processing');
-    try {
-      const fallbackRes = await axios.post('http://localhost:5001/api/scrape-url', {
-        systemType,
-        promptKey: contractType === 'permanent_fixed' ? 'LOI_permanent_fixed_fields' : 'LOI_service_express_fields',
-        contractNumber,
-      });
-      
-      return res.json({
-        ...fallbackRes.data,
-        processingMethod: 'legacy_fallback'
-      });
-    } catch (fallbackErr) {
-      console.error('[Sequential Web] Fallback also failed:', fallbackErr);
-      return res.status(500).json({
-        success: false,
-        message: 'Both sequential and legacy web processing failed',
-        error: err.message
-      });
-    }
-  }
 });
 
 // --- LOGIN endpoint ---
@@ -1034,7 +458,7 @@ app.post('/api/process-sheet', async (req, res) => {
     maxOutputTokens: 5000
   }
 });
-    const geminiText = stripThinkTags(await geminiRes.response.text());
+    const geminiText = await geminiRes.response.text();
 
     // Attempt to extract Contract Number
     let contractId = 'unknown_excel_id';
@@ -1071,7 +495,7 @@ app.post('/api/scrape-url', async (req, res) => {
   console.log('[Request Body]', req.body);
 
   try {
-    const { systemType = 'simplicity', contractType = 'permanent_fixed', contractNumber } = req.body;
+    const { systemType = 'simplicity', promptKey = 'LOI_permanent_fixed_fields', contractNumber } = req.body;
 
     if (!contractNumber) {
       console.error('[❌ No contract number provided]');
@@ -1083,13 +507,7 @@ app.post('/api/scrape-url', async (req, res) => {
       return res.status(401).json({ message: 'Not logged in for Simplicity' });
     }
 
-    const session = browserSessions.get(systemType);
-    if (!session || !session.browser || !session.page) {
-      console.error('[❌ Invalid browser session]');
-      return res.status(500).json({ message: 'Invalid browser session. Please login again.' });
-    }
-    
-    const { browser, page } = session;
+    const { browser, page } = browserSessions.get(systemType);
     const isLeaseOffer = contractNumber.includes('LO');
     const submenuText = isLeaseOffer ? 'Lease Offer' : 'Lease Renewal';
 
@@ -1176,55 +594,26 @@ app.post('/api/scrape-url', async (req, res) => {
       // Now wait for the new popup
       let popup;
       for (let i = 0; i < 15; i++) {
-        console.log(`[Simplicity] Popup search attempt ${i + 1}/15, looking for URL containing: ${popupUrlMatch}`);
         const pages = await browser.pages();
-        console.log(`[Simplicity] Current pages (${pages.length} total):`, pages.map(p => p.url()));
         popup = pages.find(p => p.url().includes(popupUrlMatch) && p !== page);
-        if (popup) {
-          console.log(`[Simplicity] ✅ Popup found: ${popup.url()}`);
-          break;
-        }
-        console.log(`[Simplicity] ⏳ Popup not found yet, waiting 2 seconds...`);
+        if (popup) break;
         await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+}
     
     if (!popup) {
       console.error('❌ Popup window not found for:', popupUrlMatch);
-      console.log('[Simplicity] 🔍 All current pages at timeout:');
-      const allPages = await browser.pages();
-      allPages.forEach((p, index) => {
-        console.log(`  Page ${index + 1}: ${p.url()}`);
-      });
-      
-      // Try to find any new page that appeared after the main page
-      const possiblePopup = allPages.find(p => p !== page && !p.url().includes('apptop.aspx') && !p.url().includes('about:blank'));
-      if (possiblePopup) {
-        console.log(`[Simplicity] 🔍 Found possible popup with different URL: ${possiblePopup.url()}`);
-        popup = possiblePopup;
-      } else {
-        throw new Error('❌ Popup window not found');
-      }
+      throw new Error('❌ Popup window not found');
     }
 
 
 
 
-      console.log('[Simplicity] Bringing popup to front...');
       await popup.bringToFront();
-      
-      console.log('[Simplicity] Waiting for popup content to load...');
-      await popup.waitForFunction(() => document.body && document.body.innerText.trim().length > 0, { timeout: 0 });
+      await popup.waitForFunction(() => document.body && document.body.innerText.trim().length > 0, { timeout: 60000 });
 
-      console.log('[Simplicity] Waiting for popup navigation to complete...');
-      try {
-        await Promise.race([
-          popup.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }),
-          new Promise(resolve => setTimeout(resolve, 10000))
-        ]);
-        console.log('[Simplicity] ✅ Navigation complete or timeout reached');
-      } catch (err) {
-        console.warn('[⚠️ popup.waitForNavigation] Error or already loaded:', err.message);
-      }
+      await popup.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {
+        console.warn('[⚠️ popup.waitForNavigation] Timeout or already loaded');
+      });
 
       // build your TYPE value however you need, then…
      // const encodedType = encodeURIComponent(typeValue);  // ← whatever logic you use to pick/type‐encode your TYPE
@@ -1241,107 +630,43 @@ app.post('/api/scrape-url', async (req, res) => {
         '#panelOneTimeCharge_label'
       ];
 
-      console.log('[Simplicity] Waiting 10 seconds for page to fully load...');
       await new Promise(resolve => setTimeout(resolve, 10000));
-      
-      console.log('[Simplicity] Starting to expand collapsible sections...');
-      for (let i = 0; i < collapsibleIds.length; i++) {
-        const selector = collapsibleIds[i];
-        console.log(`[Simplicity] Processing collapsible ${i + 1}/${collapsibleIds.length}: ${selector}`);
+      for (const selector of collapsibleIds) {
         try {
-          const element = await popup.$(selector);
-          if (!element) {
-            console.log(`[Simplicity] ⚠️ Element not found: ${selector}`);
-            continue;
-          }
-          
           const isCollapsed = await popup.$eval(selector, el => el.classList.contains('collapsible-panel-collapsed'));
-          console.log(`[Simplicity] ${selector} collapsed status: ${isCollapsed}`);
-          
           if (isCollapsed) {
-            console.log(`[Simplicity] Clicking to expand: ${selector}`);
             await popup.click(selector);
-            console.log(`[Simplicity] ✅ Expanded: ${selector}`);
-            console.log(`[Simplicity] Waiting 7 seconds for expansion to complete...`);
-            await new Promise(resolve => setTimeout(resolve, 7000));
-          } else {
-            console.log(`[Simplicity] Already expanded: ${selector}`);
+            console.log(`✅ Expanded: ${selector}`);
+            await popup.waitForTimeout(7000);
           }
         } catch (err) {
-          console.warn(`[Simplicity] ⚠️ Could not expand ${selector}:`, err.message);
+          console.warn(`⚠️ Could not expand ${selector}:`, err.message);
         }
       }
-      
-      console.log('[Simplicity] Finished expanding all collapsible sections');
 
       scrapedText = await popup.evaluate(() => document.body.innerText);
       console.log('[Simplicity] Scraped content:', scrapedText);
 
-      // Use PromptManager to get extraction prompt
-      const promptManager = new PromptManager();
-      let promptTemplate;
-      try {
-        promptTemplate = promptManager.createLegacyExtractionPrompt(contractType);
-        console.log(`[✅ Loaded modular extraction prompt for ${contractType}]`);
-      } catch (err) {
-        console.error(`[❌ Failed to load extraction prompt for ${contractType}]`, err);
-        return res.status(400).json({ message: `Failed to load extraction prompt for ${contractType}`, error: err.message });
+      const promptFilePath = path.join(__dirname, 'prompts', `${promptKey}.txt`);
+      if (!fs.existsSync(promptFilePath)) {
+        console.error(`[❌ Prompt template '${promptKey}' not found.`);
+        return res.status(400).json({ message: `Prompt template '${promptKey}' not found.` });
       }
 
+      const promptTemplate = fs.readFileSync(promptFilePath, 'utf8');
       const finalPrompt = `${promptTemplate}\n\nContent:\n${scrapedText}`;
 
-      console.log('[Simplicity] Sending content to Lotus LLM...');
-      
-      // Use Lotus LLM API instead of Gemini for web scraping
-      const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-      const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
-      
-      let geminiText;
-      const maxRetries = 3;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`[🔄 Lotus LLM web scraping attempt ${attempt}/${maxRetries}]`);
-          
-          const response = await axios.post(LOTUS_LLM_URL, {
-            model: 'default',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a contract data extraction assistant. Extract data from the provided content and return it as a valid JSON object only.'
-              },
-              {
-                role: 'user',
-                content: finalPrompt
-              }
-            ],
-            temperature: 0.1,
-            max_tokens: 5000
-          }, {
-            headers: {
-              'Authorization': `Bearer ${LOTUS_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 0 // No timeout - wait indefinitely
-          });
-          
-          geminiText = stripThinkTags(response.data.choices[0].message.content);
-          console.log('[✅ Lotus LLM web scraping successful]');
-          break;
-        } catch (fetchError) {
-          console.warn(`[⚠️ Lotus LLM web scraping attempt ${attempt}/${maxRetries} failed]`, fetchError.message);
-          
-          if (attempt === maxRetries) {
-            console.error('[❌ All Lotus LLM web scraping attempts failed]');
-            throw new Error(`Lotus LLM API failed after ${maxRetries} attempts: ${fetchError.message}`);
-          }
-          
-          // Add delay between retries
-          const waitTime = 2000 * attempt; // 2s, 4s, 6s
-          console.log(`[⏳ Web scraping waiting ${waitTime}ms before retry...]`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
+      console.log('[Simplicity] Sending content to Gemini model...');
+      const geminiRes = await model.generateContent({
+  contents: [{ parts: [{ text: finalPrompt }] }],
+  generationConfig: {
+    temperature: 0.1,        // 🔽 Lower = less hallucination
+    topK: 1,
+    topP: 0.8,
+    maxOutputTokens: 5000
+  }
+});
+      const geminiText = await geminiRes.response.text();
 
       let contractId = contractNumber || 'unknown_scrape_id';
       let leaseType = '';
@@ -1413,8 +738,6 @@ app.post('/api/open-popup-tab', async (req, res) => {
         args: ['--start-fullscreen']
       });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
 
       // 1) Load landing
       console.log('[Login] Navigating to apptop.aspx');
@@ -1445,7 +768,7 @@ app.post('/api/open-popup-tab', async (req, res) => {
       console.log('[Login] Waiting for password field');
       await page.waitForSelector('input#password', { timeout: 20000 });
       console.log('[Login] Typing password');
-      await page.type('input#password', 'Gofresh@0725-19', { delay: 50 });
+      await page.type('input#password', 'Gofresh@0425-21', { delay: 50 });
       const cont2 = '#root > div > div > div.sc-dymIpo.izSiFn > div.withConditionalBorder.sc-bnXvFD.izlagV > div.sc-jzgbtB.bIuYUf > form > div > div:nth-child(4) > div > button';
       console.log('[Login] Waiting for Continue #2');
       await page.waitForSelector(cont2, { timeout: 20000 });
@@ -1555,8 +878,6 @@ app.post('/api/scrape-login', async (req, res) => {
       // 2) Launch fresh browser + page
       browser = await puppeteer.launch({ headless: false });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
 
       // 3) Go to the Simplicity landing page
       await page.goto(
@@ -1685,555 +1006,50 @@ app.post('/api/fetch-latest-json', async (req, res) => {
   }
 });
 
-// ===== FALLBACK COMPARISON FIELDS FUNCTION =====
-function getFallbackComparisonFields(category) {
-  const fallbackData = {
-    basic: [
-      { field: "อยู่กองทรัสต์หรือไม่", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Building Name", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Brand Name", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Customer Name", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Customer Address", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Unit ID", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Space (NLA)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Tenant Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Proposed lease commencement date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Proposed lease expiry date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Billing Frequency", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
-    ],
-    lease_terms: [
-      { field: "Lease Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Monthly charge", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 1 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 1 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 1 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 1 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 1 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 2 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 2 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 2 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 2 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 2 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 3 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 3 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 3 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 3 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Year 3 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Total Rent Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Total Service Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
-    ],
-    service_charges: [
-      { field: "Other service charge (in the renting space)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (in the renting space) Charge description", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (in the renting space) start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (in the renting space) end date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (Common area)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (Common area) Charge description", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (Common area) start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Other service charge (Common area) end date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
-    ],
-    tax_deposits: [
-      { field: "Lease property tax", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Deposits Amount", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
-    ],
-    utilities: [
-      { field: "Include Utility", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Utilities charge (water)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Utilities charge (Electricity)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
-      { field: "Utilities charge (cooking gas)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
-    ]
-  };
-  
-  return fallbackData[category] || [{ field: `${category}_fallback`, pdf: "Unknown category", web: "Unknown category", match: false, reason: "Unknown category processed" }];
-}
-
+// === Existing Gemini Compare Endpoint ===
 // === Existing Gemini Compare Endpoint ===
 app.post('/api/gemini-compare', async (req, res) => {
   console.log('[👁️ HIT /api/gemini-compare]')
-  const { formattedSources, promptKey = 'LOI_permanent_fixed_fields', contractNumber, contractType: requestContractType } = req.body;
+  const { formattedSources, promptKey = 'LOI_permanent_fixed_fields' } = req.body;
+
+  // 🔍 Determine which compare prompt file to use based on contract type
+  let comparePromptFile = 'LOI_permanent_fixed_fields_compare.txt';
+  if (promptKey.includes('service_express')) {
+    comparePromptFile = 'LOI_service_express_fields_compare.txt';
+  }
+
+  const promptPath = path.join(__dirname, 'prompts', comparePromptFile);
+
+  if (!fs.existsSync(promptPath)) {
+    return res.status(400).json({
+      message: `Prompt comparison file not found: ${comparePromptFile}`,
+    });
+  }
+
+  const promptTemplate = fs.readFileSync(promptPath, 'utf8');
+
+  const sourcesString = Object.entries(formattedSources)
+    .map(([key, json]) => `${key.toUpperCase()}: ${JSON.stringify(json, null, 2)}`)
+    .join('\n\n');
+
+  const finalPrompt = `${promptTemplate}\n\nSources:\n${sourcesString}`;
 
   try {
-    // 🔍 Use contractType from request body if provided, otherwise derive from promptKey
-    const contractType = requestContractType || (promptKey.includes('service_express') ? 'service_express' : 'permanent_fixed');
-    console.log(`[🔍 Contract type resolved] RequestType: ${requestContractType}, PromptKey: ${promptKey}, Final: ${contractType}`);
-    
-    // Use PromptManager to get comparison prompts
-    const promptManager = new PromptManager();
-    const comparisonCategories = ['basic', 'lease_terms', 'service_charges', 'utilities', 'tax_deposits'];
-    
-    // Prepare sources string once
-    const sourcesString = Object.entries(formattedSources)
-      .map(([key, json]) => `${key.toUpperCase()}: ${JSON.stringify(json, null, 2)}`)
-      .join('\n\n');
-    
-    // Use Lotus LLM API instead of Gemini for comparison
-    const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
-    
-    // Process each category separately to avoid overload
-    const allResults = [];
-    console.log('[🔄 Using chunked Lotus LLM comparison]');
-    
-    for (const category of comparisonCategories) {
-      try {
-        console.log(`[📊 Processing category: ${category}]`);
-        const categoryPrompt = promptManager.createComparisonPrompt(category, contractType, contractNumber);
-        const finalPrompt = `${categoryPrompt}\n\nSources:\n${sourcesString}`;
-        
-        // Log the prompt for basic category (where LR rule should apply)
-        if (category === 'basic') {
-          console.log(`[🔍 BASIC CATEGORY PROMPT PREVIEW]:`);
-          console.log(`Contract Number in prompt: ${contractNumber}`);
-          console.log(`Prompt preview (first 500 chars): ${finalPrompt.substring(0, 500)}...`);
-          if (finalPrompt.includes('LR CONTRACT RULE')) {
-            console.log(`[✅ LR CONTRACT RULE found in basic category prompt]`);
-          } else {
-            console.log(`[❌ LR CONTRACT RULE NOT found in basic category prompt]`);
-          }
-        }
-        
-        // Add delay between requests to avoid overload
-        if (allResults.length > 0) {
-          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay to reduce API load
-        }
-        
-        const response = await axios.post(LOTUS_LLM_URL, {
-          model: 'default',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a contract comparison assistant. Return ONLY a valid JSON array without any markdown formatting, code blocks, or additional text. Do not use ```json or ``` markers.'
-            },
-            {
-              role: 'user',
-              content: finalPrompt
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 4000 // Further increased for complete field lists
-        }, {
-          headers: {
-            'Authorization': `Bearer ${LOTUS_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10800000 // 3 hours timeout (effectively infinite)
-        });
-        
-        const categoryResult = response.data.choices[0].message.content;
-        console.log(`[✅ Category ${category} processed successfully]`);
-        console.log(`[🔍 ${category} raw response length:`, categoryResult.length);
-        console.log(`[🔍 ${category} response preview:`, categoryResult.substring(0, 500) + '...');
-        
-        // Strip think tags first, then clean the response
-        const withoutThinkTags = stripThinkTags(categoryResult);
-        let cleanedResult = withoutThinkTags.trim();
-        console.log(`[🧹 ${category} after cleaning length:`, cleanedResult.length);
-        
-        // Remove markdown code blocks if present
-        if (cleanedResult.includes('```json')) {
-          cleanedResult = cleanedResult.replace(/```json\s*/gi, '').replace(/```/g, '');
-        } else if (cleanedResult.includes('```')) {
-          cleanedResult = cleanedResult.replace(/```\s*/g, '');
-        }
-        
-        // Remove any stray backticks
-        cleanedResult = cleanedResult.replace(/`/g, '').trim();
-        
-        // Parse and merge results
-        try {
-          const parsed = JSON.parse(cleanedResult);
-          if (Array.isArray(parsed)) {
-            console.log(`[✅ ${category} parsed successfully - ${parsed.length} fields]`);
-            console.log(`[📊 ${category} fields:`, parsed.map(p => p.field).join(', '));
-            allResults.push(...parsed);
-          } else {
-            console.warn(`[⚠️ Category ${category} did not return an array]`);
-          }
-        } catch (parseErr) {
-          console.warn(`[⚠️ Failed to parse category ${category} results]`, parseErr.message);
-          console.warn(`[🔍 Raw response preview for ${category}]:`, cleanedResult.substring(0, 200) + '...');
-          
-          // Try to salvage partial JSON if it's truncated
-          if (parseErr.message.includes('Unterminated string') || parseErr.message.includes('Unexpected end')) {
-            console.log(`[🩹 Attempting to fix truncated JSON for ${category}]`);
-            try {
-              // Try to close the JSON properly by finding the last complete object
-              let salvaged = cleanedResult;
-              
-              // Find the last complete field entry
-              const lastCompleteIndex = salvaged.lastIndexOf('}');
-              if (lastCompleteIndex > 0) {
-                salvaged = salvaged.substring(0, lastCompleteIndex + 1);
-                // Ensure it ends with proper array closing
-                if (!salvaged.trim().endsWith(']')) {
-                  salvaged = salvaged + ']';
-                }
-                
-                const salvagedParsed = JSON.parse(salvaged);
-                if (Array.isArray(salvagedParsed)) {
-                  allResults.push(...salvagedParsed);
-                  console.log(`[✅ Salvaged ${salvagedParsed.length} fields from ${category}]`);
-                }
-              }
-            } catch (salvageErr) {
-              console.warn(`[❌ Could not salvage ${category} results]`, salvageErr.message);
-            }
-          }
-        }
-        
-      } catch (err) {
-        console.error(`[❌ Failed to process category ${category}]`, err.message);
-        
-        // Add fallback comparison data for failed categories
-        console.log(`[🔧 Creating fallback comparison data for ${category}]`);
-        const fallbackFields = getFallbackComparisonFields(category);
-        allResults.push(...fallbackFields);
-      }
-    }
-    
-    // Return combined results
-    console.log(`[✅ Lotus LLM comparison complete - ${allResults.length} fields compared]`);
-    console.log(`[📊 All comparison fields:`, allResults.map(r => r.field).join(', '));
-    console.log(`[📈 Results per category:`, allResults.reduce((acc, r) => {
-      const category = r.field.includes('Year') ? 'lease_terms' : 
-                      r.field.includes('Deposit') || r.field.includes('tax') ? 'tax_deposits' :
-                      r.field.includes('Utility') || r.field.includes('Include') ? 'utilities' :
-                      r.field.includes('Service') || r.field.includes('charge') ? 'service_charges' : 'basic';
-      acc[category] = (acc[category] || 0) + 1;
-      return acc;
-    }, {}));
-    res.json({ response: JSON.stringify(allResults) });
-    
-  } catch (err) {
-    console.error('[❌ Gemini Compare Error]', err);
-    res.status(500).json({ message: 'Gemini comparison failed', error: err.message });
+    const geminiRes = await model.generateContent({
+  contents: [{ parts: [{ text: finalPrompt }] }],
+  generationConfig: {
+    temperature: 0.1,        // 🔽 Lower = less hallucination
+    topK: 1,
+    topP: 0.8,
+    maxOutputTokens: 5000
   }
 });
-
-// ===== Modular Validation Endpoint =====
-app.post('/api/validate-modular', async (req, res) => {
-  console.log('[🔧 HIT /api/validate-modular]');
-  const { extractedData, contractType, contractNumber, sourceType = 'pdf' } = req.body;
-  
-  if (!extractedData || typeof extractedData !== 'object') {
-    console.error('[Modular Validation] Invalid extractedData:', extractedData);
-    return res.status(400).json({ message: 'Invalid extracted data' });
-  }
-  
-  if (!contractType) {
-    console.error('[Modular Validation] Missing contractType');
-    return res.status(400).json({ message: 'Contract type is required' });
-  }
-  
-  try {
-    // === Excel File Validations (Master_9_cell.xlsx, Master_PT.xlsx, bigtenant.xlsx) ===
-    let excelValidationResults = [];
-    const buildingId = extractedData['Building ID'];
-    const brandName = extractedData['Brand Name'];
-    const customerName = extractedData['Customer Name'];
-    
-    // 1) Master_9_cell.xlsx - Building ID check for deposit rules
-    let buildingFoundInExcel = false;
-    const masterExcelPath = path.join(__dirname, 'prompts', 'Master_9_cell.xlsx');
-    if (fs.existsSync(masterExcelPath)) {
-      console.log('[Modular Validation] Found Master_9_cell.xlsx; reading...');
-      try {
-        const workbook = xlsx.readFile(masterExcelPath);
-        const firstSheetName = workbook.SheetNames[0];
-        const masterData = xlsx.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
-        
-        if (masterData.length > 0 && buildingId) {
-          const firstColumnHeader = Object.keys(masterData[0])[0];
-          buildingFoundInExcel = masterData.some(row => 
-            String(row[firstColumnHeader]).trim() === String(buildingId).trim()
-          );
-          console.log(buildingFoundInExcel 
-            ? `[Modular Validation] Building ID "${buildingId}" FOUND in Master_9_cell.xlsx`
-            : `[Modular Validation] Building ID "${buildingId}" NOT FOUND in Master_9_cell.xlsx`
-          );
-        }
-      } catch (err) {
-        console.error('[Modular Validation] Error reading Master_9_cell.xlsx:', err);
-      }
-    }
-    
-    // 2) Master_PT.xlsx - Brand Name check for tax rules
-    let brandFoundInPT = false;
-    const ptExcelPath = path.join(__dirname, 'prompts', 'Master_PT.xlsx');
-    if (fs.existsSync(ptExcelPath)) {
-      console.log('[Modular Validation] Found Master_PT.xlsx; reading...');
-      try {
-        const wbPT = xlsx.readFile(ptExcelPath);
-        const ptSheetName = wbPT.SheetNames[0];
-        const ptData = xlsx.utils.sheet_to_json(wbPT.Sheets[ptSheetName]);
-        
-        if (ptData.length > 0 && brandName) {
-          const secondColumnHeader = Object.keys(ptData[0])[1];
-          brandFoundInPT = ptData.some(row => {
-            const brandInSheet = String(row[secondColumnHeader] || '').trim().toLowerCase();
-            return brandInSheet === String(brandName).trim().toLowerCase();
-          });
-          console.log(brandFoundInPT 
-            ? `[Modular Validation] Brand Name "${brandName}" FOUND in Master_PT.xlsx`
-            : `[Modular Validation] Brand Name "${brandName}" NOT FOUND in Master_PT.xlsx`
-          );
-        }
-      } catch (err) {
-        console.error('[Modular Validation] Error reading Master_PT.xlsx:', err);
-      }
-    }
-    
-    // 3) bigtenant.xlsx - Customer Name check for deposit rules
-    let customerFoundInBigTenant = false;
-    const bigTenantPath = path.join(__dirname, 'prompts', 'bigtenant.xlsx');
-    if (fs.existsSync(bigTenantPath)) {
-      console.log('[Modular Validation] Found bigtenant.xlsx; reading...');
-      try {
-        const wbBig = xlsx.readFile(bigTenantPath);
-        const bigSheetName = wbBig.SheetNames[0];
-        const bigTenantData = xlsx.utils.sheet_to_json(wbBig.Sheets[bigSheetName]);
-        
-        if (bigTenantData.length > 0 && customerName) {
-          // Check all columns for customer name match (exact match, case-insensitive)
-          customerFoundInBigTenant = bigTenantData.some(row => {
-            return Object.values(row).some(cellValue => {
-              if (cellValue === null || cellValue === undefined || cellValue === '') {
-                return false;
-              }
-              const cellStr = String(cellValue).trim().toLowerCase();
-              const customerStr = String(customerName).trim().toLowerCase();
-              // Exact match only, no partial matches
-              return cellStr !== '' && cellStr === customerStr;
-            });
-          });
-          console.log(customerFoundInBigTenant 
-            ? `[Modular Validation] Customer Name "${customerName}" FOUND in bigtenant.xlsx`
-            : `[Modular Validation] Customer Name "${customerName}" NOT FOUND in bigtenant.xlsx`
-          );
-        }
-      } catch (err) {
-        console.error('[Modular Validation] Error reading bigtenant.xlsx:', err);
-      }
-    }
-
-    // Use PromptManager to get validation prompts
-    const promptManager = new PromptManager();
-    const validationCategories = ['required', 'business', 'deposits'];
-    
-    // Add signature and citizen_id validation only for PDF (not available in web data)
-    if (sourceType === 'pdf') {
-      validationCategories.push('signatures', 'citizen_id');
-    }
-    
-    // Use Lotus LLM API for validation
-    const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
-    
-    // Process each validation category separately
-    const allValidationResults = [];
-    console.log(`[🔄 Using chunked Lotus LLM validation for ${sourceType}]`);
-    
-    for (const category of validationCategories) {
-      try {
-        console.log(`[📊 Processing validation category: ${category}]`);
-        let categoryPrompt = promptManager.createValidationPrompt(category, contractType, contractNumber, sourceType);
-        
-        if (!categoryPrompt) {
-          console.log(`[⏭️ Skipping ${category} validation for ${sourceType} data]`);
-          continue;
-        }
-        
-        // Modify prompts based on Excel lookups
-        if (category === 'deposits') {
-          // Add Excel lookup context to deposit validation
-          let excelContext = '\n--- EXCEL LOOKUP RESULTS ---\n';
-          
-          if (buildingFoundInExcel) {
-            excelContext += `Building ID "${buildingId}" FOUND in Master_9_cell.xlsx - Apply 2× deposit rule instead of 3×\n`;
-          } else {
-            excelContext += `Building ID "${buildingId}" NOT FOUND in Master_9_cell.xlsx - Apply standard deposit rules\n`;
-          }
-          
-          if (customerFoundInBigTenant) {
-            excelContext += `Customer Name "${customerName}" FOUND in bigtenant.xlsx - Apply big tenant deposit requirements (3× minimum)\n`;
-          } else {
-            excelContext += `Customer Name "${customerName}" NOT FOUND in bigtenant.xlsx - Apply standard deposit rules\n`;
-          }
-          
-          excelContext += '--- END EXCEL LOOKUPS ---\n\n';
-          categoryPrompt = excelContext + categoryPrompt;
-          
-          // Update deposit rules based on Excel lookups
-          if (customerFoundInBigTenant) {
-            categoryPrompt += '\n\n**SPECIAL RULE**: Customer is in bigtenant.xlsx - deposit must be ≥ 3 × Monthly rental rate regardless of other rules.';
-          } else if (buildingFoundInExcel) {
-            categoryPrompt += '\n\n**SPECIAL RULE**: Building ID found in Master_9_cell.xlsx - minimum deposit requirement is 2 × Monthly rental rate instead of standard 3×.';
-          }
-        }
-        
-        if (category === 'business') {
-          // Add Excel lookup context to business rules for tax validation
-          let taxContext = '\n--- TAX VALIDATION CONTEXT ---\n';
-          
-          if (brandFoundInPT) {
-            taxContext += `Brand Name "${brandName}" FOUND in Master_PT.xlsx - Lease property tax rate MUST be 0\n`;
-          } else {
-            taxContext += `Brand Name "${brandName}" NOT FOUND in Master_PT.xlsx - No special tax requirements\n`;
-          }
-          
-          taxContext += '--- END TAX CONTEXT ---\n\n';
-          categoryPrompt = taxContext + categoryPrompt;
-          
-          // Update tax validation rule
-          if (brandFoundInPT) {
-            categoryPrompt += '\n\n**SPECIAL TAX RULE**: Brand Name found in Master_PT.xlsx - "Lease property tax rate" must be exactly 0. If not 0, mark as invalid with reason: "Brand Name found in Master_PT.xlsx; Lease property tax rate must be zero".';
-          }
-        }
-        
-        const finalPrompt = `${categoryPrompt}\n\nContract Data:\n${JSON.stringify(extractedData, null, 2)}`;
-        
-        // Add delay between requests to avoid overload
-        if (allValidationResults.length > 0) {
-          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay to reduce API load
-        }
-        
-        const response = await axios.post(LOTUS_LLM_URL, {
-          model: 'default',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a contract validation assistant. Return ONLY a valid JSON array without any markdown formatting, code blocks, or additional text. Do not use ```json or ``` markers.'
-            },
-            {
-              role: 'user',
-              content: finalPrompt
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 6000 // Further increased for complex validation responses
-        }, {
-          headers: {
-            'Authorization': `Bearer ${LOTUS_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10800000 // 3 hours timeout (effectively infinite)
-        });
-        
-        const categoryResult = response.data.choices[0].message.content;
-        console.log(`[✅ Validation category ${category} processed successfully]`);
-        
-        // Strip think tags first, then clean the response
-        const withoutThinkTags = stripThinkTags(categoryResult);
-        let cleanedResult = withoutThinkTags.trim();
-        
-        // Remove markdown code blocks if present
-        if (cleanedResult.includes('```json')) {
-          cleanedResult = cleanedResult.replace(/```json\s*/gi, '').replace(/```/g, '');
-        } else if (cleanedResult.includes('```')) {
-          cleanedResult = cleanedResult.replace(/```\s*/g, '');
-        }
-        
-        // Remove any stray backticks
-        cleanedResult = cleanedResult.replace(/`/g, '').trim();
-        
-        // Parse and merge results
-        try {
-          const parsed = JSON.parse(cleanedResult);
-          if (Array.isArray(parsed)) {
-            console.log(`[✅ Validation ${category} parsed successfully - ${parsed.length} checks]`);
-            console.log(`[📊 Validation ${category} fields:`, parsed.map(p => p.field || p.issue || 'unknown').join(', '));
-            allValidationResults.push(...parsed);
-          } else {
-            console.warn(`[⚠️ Validation category ${category} did not return an array]`);
-          }
-        } catch (parseErr) {
-          console.warn(`[⚠️ Failed to parse validation category ${category} results]`, parseErr.message);
-          console.warn(`[🔍 Raw validation response for ${category}]:`, cleanedResult.substring(0, 1000));
-          console.warn(`[🔍 End of validation response for ${category}]:`, cleanedResult.substring(Math.max(0, cleanedResult.length - 200)));
-          
-          // Try to fix truncated JSON for validation
-          if (parseErr.message.includes('Unexpected end of JSON input')) {
-            console.log(`[🩹 Attempting AGGRESSIVE fix for validation ${category}]`);
-            try {
-              let fixedResult = cleanedResult.trim();
-              
-              // AGGRESSIVE: Remove any trailing incomplete text after last complete object
-              let lastCompleteObjectEnd = fixedResult.lastIndexOf('}');
-              if (lastCompleteObjectEnd > 0) {
-                // Keep everything up to the last complete object
-                let truncatedAtObject = fixedResult.substring(0, lastCompleteObjectEnd + 1);
-                
-                // Count brackets and braces in the truncated version
-                const openBrackets = (truncatedAtObject.match(/\[/g) || []).length;
-                const closeBrackets = (truncatedAtObject.match(/\]/g) || []).length;
-                const openBraces = (truncatedAtObject.match(/\{/g) || []).length;  
-                const closeBraces = (truncatedAtObject.match(/\}/g) || []).length;
-                
-                console.log(`[🔧 After truncation - Brackets: [${openBrackets}|${closeBrackets}], Braces: {${openBraces}|${closeBraces}}]`);
-                
-                // Add missing brackets
-                if (openBrackets > closeBrackets) {
-                  truncatedAtObject += ']' .repeat(openBrackets - closeBrackets);
-                  console.log(`[🔧 Added ${openBrackets - closeBrackets} closing brackets]`);
-                }
-                
-                fixedResult = truncatedAtObject;
-                console.log(`[🔧 Final result length: ${fixedResult.length}]`);
-                
-                const salvagedParsed = JSON.parse(fixedResult);
-                if (Array.isArray(salvagedParsed)) {
-                  console.log(`[✅ AGGRESSIVE FIX SUCCESS - recovered ${salvagedParsed.length} validation items for ${category}]`);
-                  allValidationResults.push(...salvagedParsed);
-                } else {
-                  console.warn(`[⚠️ Aggressive fix resulted in non-array for ${category}]`);
-                }
-              } else {
-                console.warn(`[⚠️ No complete objects found in ${category} response]`);
-              }
-            } catch (fixErr) {
-              console.warn(`[❌ Aggressive fix failed for ${category}:`, fixErr.message);
-            }
-          }
-        }
-        
-      } catch (err) {
-        console.error(`[❌ Failed to process validation category ${category}]`, err.message);
-      }
-    }
-    
-    // Add missing web validation fields if categories failed
-    if (sourceType === 'web') {
-      const expectedWebFields = [
-        "Contract Number", "Workflow status", "Brand Name", "Tenant Type", "Unit ID", "Building ID", 
-        "Property Type", "Space Design Type", "Billing option", "Billing Frequency", "Net Rent (p.m.)", 
-        "Tenancy Deposit", "Payment Term", "Rental Ratio", "Include Utility", "Utilities (water)", 
-        "Utilities (Electricity)", "Utilities (Gas)"
-      ];
-      
-      const currentFields = allValidationResults.map(r => r.field || r.issue || '');
-      const missingFields = expectedWebFields.filter(field => !currentFields.includes(field));
-      
-      if (missingFields.length > 0) {
-        console.log(`[🔧 Adding ${missingFields.length} missing web validation fields]`);
-        const fallbackValidations = missingFields.map(field => ({
-          field: field,
-          value: "Category parsing failed",
-          valid: false,
-          reason: "Validation category failed to parse - field not validated"
-        }));
-        allValidationResults.push(...fallbackValidations);
-      }
-    }
-    
-    // Return combined validation results
-    console.log(`[✅ Lotus LLM validation complete - ${allValidationResults.length} validation checks]`);
-    console.log(`[📊 All validation fields:`, allValidationResults.map(r => r.field || r.issue || 'unknown').join(', '));
-    res.json({ validation: allValidationResults });
-    
+    const responseText = await geminiRes.response.text();
+    res.json({ response: responseText });
   } catch (err) {
-    console.error('[❌ Modular Validation Error]', err);
-    res.status(500).json({ message: 'Modular validation failed', error: err.message });
+    res.status(500).json({ message: 'Gemini comparison failed', error: err.message });
   }
+  console.log('[🧾 Final Gemini Compare Prompt]', finalPrompt);
 });
 
 // ===== Force Process Endpoint =====
@@ -2252,7 +1068,7 @@ app.post('/api/force-process-contract', async (req, res) => {
     const loginRes = await axios.post(`${API_URL}/api/scrape-login`, {
       systemType: 'simplicity',
       username:   'john.pattanakarn@lotuss.com',
-      password:   'Gofresh@0725-19'
+      password:   'Gofresh@0425-21'
     });
     if (!loginRes.data.success) {
       throw new Error('Auto-login to Simplicity failed');
@@ -2339,8 +1155,6 @@ app.post('/api/web-validate', async (req, res) => {
         args: ['--start-fullscreen']
       });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
       await page.setViewport({ width: 1920, height: 1080 });
 
       console.log('[LOGIN] Navigating to landing page');
@@ -2368,7 +1182,7 @@ app.post('/api/web-validate', async (req, res) => {
 
       console.log('[LOGIN] entering password');
       await page.waitForSelector('input#password', { visible: true, timeout: 20000 });
-      await page.type('input#password', 'Gofresh@0725-19', { delay: 50 });
+      await page.type('input#password', 'Gofresh@0425-21', { delay: 50 });
 
       const continueSel2 =
         '#root > div > div > div.sc-dymIpo.izSiFn > div.withConditionalBorder.sc-bnXvFD.izlagV ' +
@@ -2429,19 +1243,7 @@ app.post('/api/web-validate', async (req, res) => {
     let utilityRaw = null;
     let meterValidation = null;
 
-    // Debug the Include Utility field
-    console.log('[Utility Debug] extractedData["Include Utility"]:', extractedData['Include Utility']);
-    console.log('[Utility Debug] contractNumber:', contractNumber);
-    console.log('[Utility Debug] contractNumber.includes("LO"):', contractNumber.includes('LO'));
-    
-    // Check for variations in utility field name and value
-    const utilityValue = extractedData['Include Utility'] || extractedData['Utility'] || extractedData['Include utility'];
-    const isUtilityYes = utilityValue && (utilityValue.toLowerCase() === 'yes' || utilityValue.toLowerCase().includes('yes'));
-    
-    console.log('[Utility Debug] utilityValue (normalized):', utilityValue);
-    console.log('[Utility Debug] isUtilityYes:', isUtilityYes);
-    
-    if (isUtilityYes && contractNumber.includes('LO')) {
+    if (extractedData['Include Utility'] === 'Yes' && contractNumber.includes('LO')) {
       console.log('[Utility] Include Utility=Yes & LO… → scraping Meter…');
 
       try {
@@ -2519,38 +1321,18 @@ utilityRaw = await frame.evaluate(() => document.body.innerText);
 console.log('[Utility] scraped raw after combined search:', utilityRaw);
 
 
-        // 3.8 run Lotus LLM on that Meter page
+        // 3.8 run Gemini on that Meter page
         const meterPromptPath = path.join(__dirname, 'prompts', 'meter_check.txt');
         if (fs.existsSync(meterPromptPath)) {
           const meterTemplate = fs.readFileSync(meterPromptPath, 'utf8');
           const meterPrompt = `${meterTemplate}\n\nMeter page content:\n${utilityRaw}`;
-          console.log('[Meter Validation] sending to Lotus LLM');
-          
-          // Use Lotus LLM API for meter validation
-          const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-          const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
-          
+          console.log('[Meter Validation] sending to Gemini');
+          const mRes = await model.generateContent(meterPrompt);
+          let mText = (await mRes.response.text()).trim();
+          if (mText.startsWith('```json')) mText = mText.slice(7);
+          if (mText.endsWith('```'))      mText = mText.slice(0, -3);
+
           try {
-            const response = await axios.post(LOTUS_LLM_URL, {
-              model: 'default',
-              messages: [
-                {
-                  role: 'user',
-                  content: meterPrompt
-                }
-              ]
-            }, {
-              headers: {
-                'Authorization': `Bearer ${LOTUS_API_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              timeout: 0 // No timeout - wait indefinitely
-            });
-
-            let mText = response.data.choices[0].message.content.trim();
-            if (mText.startsWith('```json')) mText = mText.slice(7);
-            if (mText.endsWith('```')) mText = mText.slice(0, -3);
-
             meterValidation = JSON.parse(mText);
             console.log('[Meter Validation] parsed:', meterValidation);
           } catch (e) {
@@ -2910,8 +1692,6 @@ app.post('/api/refresh-contract-status', async (req, res) => {
       // mirror your check-contract-status login logic here
       browser = await puppeteer.launch({ headless: false });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
       console.log('[REFRESH] goto landing page');
       await page.goto('https://mall-management.lotuss.com/Simplicity/apptop.aspx', { waitUntil: 'networkidle2' });
 
@@ -2932,7 +1712,7 @@ app.post('/api/refresh-contract-status', async (req, res) => {
 
       console.log('[REFRESH] enter password');
       await page.waitForSelector('input#password', { visible: true, timeout: 20000 });
-      await page.type('input#password', 'Gofresh@0725-19', { delay: 50 });
+      await page.type('input#password', 'Gofresh@0425-21', { delay: 50 });
       const cont2 = '#root > div > div > div.sc-dymIpo.izSiFn > div.withConditionalBorder.sc-bnXvFD.izlagV > div.sc-jzgbtB.bIuYUf > form > div > div:nth-child(4) > div > button';
       console.log('[REFRESH] click password Continue');
       await Promise.all([
@@ -3054,8 +1834,6 @@ app.post('/api/save-compare-result', async (req, res) => {
     pdfGemini,
     webGemini,
     validationResult,
-    webValidationResult, // ✅ Add missing web validation field
-    meterValidationResult, // ✅ Add missing meter validation field
     popupUrl // ✅ New field added
   } = req.body;
 
@@ -3067,20 +1845,12 @@ app.post('/api/save-compare-result', async (req, res) => {
     const docId = contractNumber.replace(/\//g, '_');
     console.log('[Debug] Incoming save payload:', {
       contractNumber,
-      compareResult: compareResult ? 'present' : 'missing',
-      pdfGemini: pdfGemini ? 'present' : 'missing',
-      webGemini: webGemini ? 'present' : 'missing',
-      validationResult: Array.isArray(validationResult) ? `${validationResult.length} items` : 'missing',
-      webValidationResult: Array.isArray(webValidationResult) ? `${webValidationResult.length} items` : 'missing',
-      meterValidationResult: Array.isArray(meterValidationResult) ? `${meterValidationResult.length} items` : (meterValidationResult ? 'present but not array' : 'missing'),
+      compareResult,
+      pdfGemini,
+      webGemini,
+      validationResult,
       popupUrl
     });
-    
-    // Additional debug for meter validation
-    if (meterValidationResult) {
-      console.log('[Debug] meterValidationResult type:', typeof meterValidationResult);
-      console.log('[Debug] meterValidationResult content preview:', JSON.stringify(meterValidationResult).substring(0, 200));
-    }
     await db.collection('compare_result').doc(docId).set({
       timestamp: new Date(),
       contract_number: contractNumber,
@@ -3088,8 +1858,6 @@ app.post('/api/save-compare-result', async (req, res) => {
       web_extracted: webGemini,
       compare_result: compareResult,
       validation_result: validationResult,
-      web_validation_result: webValidationResult, // ✅ Save web validation data
-      meter_validation_result: meterValidationResult, // ✅ Save meter validation data
       popup_url: popupUrl || null
     }, { merge: true }); // ✅ ensure i
     console.log('[Firebase Save] Saving popup_url:', popupUrl);
@@ -3240,7 +2008,7 @@ app.post('/api/web-validate', async (req, res) => {
     maxOutputTokens: 5000
   }
 });
-    const geminiText = stripThinkTags(await geminiRes.response.text());
+    const geminiText = await geminiRes.response.text();
 
     // === Clean Gemini output ===
     let cleaned = geminiText.trim();
@@ -3414,8 +2182,6 @@ app.post('/api/process-sharepoint-folder', async (req, res) => {
 
 import { processOneContract } from './autoProcessor.js';
 import axios from 'axios';  // To call the /api/check-file-exists endpoint
-import SequentialProcessor from './sequentialProcessor.js';
-import PromptManager from './promptManager.js';
 
 
 app.post('/api/auto-process-pdf-folder', async (req, res) => {
@@ -3585,8 +2351,6 @@ app.post('/api/check-contract-status', async (req, res) => {
       console.log('[STEP] launching browser/session');
       browser = await puppeteer.launch({ headless: false });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
 
       console.log('[STEP] going to apptop.aspx');
       await page.goto('https://mall-management.lotuss.com/Simplicity/apptop.aspx', { waitUntil: 'networkidle2' });
@@ -3611,7 +2375,7 @@ app.post('/api/check-contract-status', async (req, res) => {
 
       console.log('[STEP] typing password');
       await page.waitForSelector('input#password', { visible: true, timeout: 20000 });
-      await page.type('input#password', 'Gofresh@0725-19', { delay: 50 });
+      await page.type('input#password', 'Gofresh@0425-21', { delay: 50 });
       await page.waitForSelector(continueSel2, { visible: true, timeout: 20000 });
       console.log('[STEP] clicking password Continue');
       await page.click(continueSel2);
@@ -3654,8 +2418,6 @@ app.post('/api/check-contract-status', async (req, res) => {
         console.log('[STEP] launching browser/session');
         browser = await puppeteer.launch({ headless: false });
         page = await browser.newPage();
-        page.setDefaultTimeout(0); // Disable all timeouts
-        page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
 
         console.log('[STEP] going to apptop.aspx');
         await page.goto('https://mall-management.lotuss.com/Simplicity/apptop.aspx', { waitUntil: 'networkidle2' });
@@ -3680,7 +2442,7 @@ app.post('/api/check-contract-status', async (req, res) => {
 
         console.log('[STEP] typing password');
         await page.waitForSelector('input#password', { visible: true, timeout: 20000 });
-        await page.type('input#password', 'Gofresh@0725-19', { delay: 50 });
+        await page.type('input#password', 'Gofresh@0425-21', { delay: 50 });
         await page.waitForSelector(continueSel2, { visible: true, timeout: 20000 });
         console.log('[STEP] clicking password Continue');
         await page.click(continueSel2);
@@ -3939,56 +2701,10 @@ app.post('/api/contract-classify', async (req, res) => {
 
     const fullPrompt = `${promptTemplate.trim()}\n\n${ocrText.trim()}`;
 
-    // Use Lotus LLM API instead of Gemini
-    const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-    const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    let text;
-    const maxRetries = 3;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[🔄 Attempting contract classification with Lotus LLM - attempt ${attempt}/${maxRetries}]`);
-        
-        const response = await axios.post(LOTUS_LLM_URL, {
-          model: 'default',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a contract classification assistant. Always respond with valid JSON only.'
-            },
-            {
-              role: 'user',
-              content: fullPrompt
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 500
-        }, {
-          headers: {
-            'Authorization': `Bearer ${LOTUS_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 0 // No timeout - wait indefinitely
-        });
-
-        text = response.data.choices[0].message.content;
-        console.log('[✅ Contract classification Lotus LLM API call successful]');
-        break;
-      } catch (fetchError) {
-        console.warn(`[⚠️ Contract classification attempt ${attempt}/${maxRetries} failed]`, fetchError.message);
-        
-        if (attempt === maxRetries) {
-          console.error('[❌ All contract classification attempts failed]');
-          throw new Error(`Contract classification Lotus LLM API failed after ${maxRetries} attempts: ${fetchError.message}`);
-        }
-        
-        // Wait before retry (exponential backoff)
-        const waitTime = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-        console.log(`[⏳ Contract classification waiting ${waitTime}ms before retry...]`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-    }
+    const result = await model.generateContent(fullPrompt);
+    const text = result.response.text();
 
     // Clean and parse
     let raw = text.trim();
@@ -3998,11 +2714,8 @@ app.post('/api/contract-classify', async (req, res) => {
     const jsonBlock = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     const parsed = JSON.parse(jsonBlock);
 
-    const contractType = parsed?.contractType?.trim() || parsed?.['Contract Type']?.trim();
-    if (!contractType) {
-      console.error('[Contract Classification] Parsed response:', parsed);
-      throw new Error('No contractType found in Gemini output');
-    }
+    const contractType = parsed?.['Contract Type']?.trim();
+    if (!contractType) throw new Error('No Contract Type found in Gemini output');
 
     res.json({ contractType });
   } catch (err) {
@@ -4011,244 +2724,6 @@ app.post('/api/contract-classify', async (req, res) => {
   }
 });
 
-
-// Meter check endpoint for autoProcessor
-app.post('/api/meter-check', async (req, res) => {
-  console.log('[Meter Check] Incoming request to /api/meter-check');
-  const { contractNumber, contractType, unitId, buildingId } = req.body;
-
-  if (!contractNumber) {
-    return res.status(400).json({ success: false, message: 'Contract number required' });
-  }
-
-  let browser;
-  try {
-    // Reuse existing browser session or create new one
-    const systemType = 'simplicity';
-    if (browserSessions.has(systemType)) {
-      const session = browserSessions.get(systemType);
-      
-      try {
-        if (!session || !session.browser || typeof session.browser.pages !== 'function') {
-          throw new Error('Browser session invalid');
-        }
-        await session.browser.pages();
-        browser = session.browser;
-      } catch (browserError) {
-        console.warn('[Meter Check] Existing browser session invalid, using existing logic');
-        browserSessions.delete(systemType);
-        return res.status(400).json({ 
-          success: false, 
-          message: 'No active browser session. Please ensure web scraping session is active.' 
-        });
-      }
-    } else {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No active browser session found. Please run web scraping first.' 
-      });
-    }
-
-    // Find the simplicity popup
-    const pages = await browser.pages();
-    let popup = pages.find(page => page.url().includes('simplicity') || page.url().includes('mall-management'));
-    
-    if (!popup) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No active Simplicity page found. Please ensure web scraping session is active.' 
-      });
-    }
-
-    console.log('[Meter Check] Using existing popup:', popup.url());
-
-    // Navigate to meter page
-    await popup.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    console.log('[Meter Check] scrolled down');
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Wait a bit to ensure page is ready
-    await new Promise(r => setTimeout(r, 3000));
-    
-    // Click Utility menu (at position 25, not 22)
-    const utilSel = '#menu_MenuLiteralDiv > ul > li:nth-child(25) > a > div.cssmenu-item-label';
-    console.log('[Meter Check] clicking Utility top-menu');
-    
-    try {
-      await popup.waitForSelector(utilSel, { visible: true, timeout: 10000 });
-      await popup.click(utilSel);
-      console.log('[Meter Check] Successfully clicked Utility menu');
-    } catch (utilError) {
-      console.error('[Meter Check] Failed to click Utility menu:', utilError.message);
-      throw new Error(`Failed to click Utility menu: ${utilError.message}`);
-    }
-
-    // Hover to expand submenu
-    console.log('[Meter Check] hovering Utility submenu');
-    await popup.evaluate(() => {
-      const li = document.querySelector('#menu_MenuLiteralDiv > ul > li:nth-child(25)');
-      if (li) {
-        li.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-        console.log('[Page] Dispatched mouseover on utility menu');
-      } else {
-        console.log('[Page] Could not find utility menu li element');
-      }
-    });
-    await new Promise(r => setTimeout(r, 5000)); // Wait for submenu to appear
-
-    // Click "Meter" submenu
-    console.log('[Meter Check] clicking Meter submenu');
-    const clickedMeter = await popup.evaluate(() => {
-      const menu = document.querySelector('#menu_MenuLiteralDiv > ul > li:nth-child(25) ul');
-      console.log('[Page] Found submenu container:', !!menu);
-      if (!menu) return false;
-      
-      const allLinks = Array.from(menu.querySelectorAll('a'));
-      console.log('[Page] Found links in submenu:', allLinks.map(a => a.textContent.trim()));
-      
-      const meterLink = allLinks.find(x => x.textContent.trim() === 'Meter');
-      console.log('[Page] Found Meter link:', !!meterLink);
-      
-      if (meterLink) { 
-        meterLink.click(); 
-        return true; 
-      }
-      return false;
-    });
-    
-    if (!clickedMeter) {
-      throw new Error('Could not find or click Meter submenu item');
-    }
-    console.log('[Meter Check] Meter submenu clicked');
-
-    // Wait & switch to bottom iframe
-    await new Promise(r => setTimeout(r, 10000));
-    const frameHandle = await popup.waitForSelector('iframe[name="frameBottom"]', { timeout: 20000 });
-    const frame = await frameHandle.contentFrame();
-   
-    await new Promise(r => setTimeout(r, 10000));
-
-    // Combined Unit ID + Building ID search
-    console.log('[Meter Check] preparing combined Unit ID + Building ID search');
-
-    // Wait for the main search box
-    await frame.waitForSelector('#panel_SimpleSearch_c1', { visible: true, timeout: 20000 });
-
-    // Use the passed Unit ID and Building ID from autoProcessor
-    console.log('[Meter Check] received Unit ID:', unitId);
-    console.log('[Meter Check] received Building ID:', buildingId);
-
-    // Build the combined search string
-    const combinedSearch = buildingId && unitId ? `${unitId} ${buildingId}` : contractNumber.replace(/\//g, '');
-
-    console.log('[Meter Check] entering combined search:', combinedSearch);
-
-    // Clear & type the combined string
-    await frame.click('#panel_SimpleSearch_c1', { clickCount: 3 });
-    await frame.type('#panel_SimpleSearch_c1', combinedSearch, { delay: 50 });
-
-    // Click search button
-    console.log('[Meter Check] clicking Search');
-    await frame.evaluate(() => {
-      const btn = document.querySelector('a#panel_buttonSearch_bt');
-      btn?.click();
-    });
-    await new Promise(r => setTimeout(r, 15000));
-
-    // Scrape meter page content
-    const utilityRaw = await frame.evaluate(() => document.body.innerText);
-    console.log('[Meter Check] scraped meter content, length:', utilityRaw.length);
-
-    // Run meter validation using Lotus LLM
-    const meterPromptPath = path.join(__dirname, 'prompts', 'meter_check.txt');
-    let meterValidation = null;
-    
-    if (fs.existsSync(meterPromptPath)) {
-      const meterTemplate = fs.readFileSync(meterPromptPath, 'utf8');
-      const meterPrompt = `${meterTemplate}\n\nMeter page content:\n${utilityRaw}`;
-      console.log('[Meter Check] sending to Lotus LLM');
-      
-      const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
-      const LOTUS_API_KEY = 'finance.lotuss.E9DD48B6C26A276CF48CDBC4D7468';
-      
-      const response = await axios.post(LOTUS_LLM_URL, {
-        model: 'default',
-        messages: [
-          {
-            role: 'user',
-            content: meterPrompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 2000
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${LOTUS_API_KEY}`
-        },
-        timeout: 0 // No timeout - wait indefinitely
-      });
-
-      const meterResponse = response.data.choices[0].message.content.trim();
-      console.log('[Meter Check] Lotus LLM response received');
-
-      try {
-        // Clean the response to extract JSON if it's embedded in text
-        let cleanedResponse = meterResponse.trim();
-        
-        // If response starts with explanatory text, try to find JSON array
-        if (cleanedResponse.startsWith("Here's") || cleanedResponse.startsWith("Based on")) {
-          const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            cleanedResponse = jsonMatch[0];
-          }
-        }
-        
-        // Remove markdown code fences if present
-        cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/```$/g, '');
-        
-        console.log('[Meter Check] Attempting to parse:', cleanedResponse.substring(0, 200));
-        meterValidation = JSON.parse(cleanedResponse);
-        console.log('[Meter Check] validation parsed successfully');
-      } catch (parseErr) {
-        console.error('[Meter Check] parse error:', parseErr.message);
-        console.error('[Meter Check] raw response:', meterResponse.substring(0, 500));
-        meterValidation = [{ field: 'Meter Check', value: 'Error', valid: false, reason: 'Failed to parse meter validation response' }];
-        console.log('[Meter Check] Using fallback error array:', meterValidation);
-      }
-    }
-
-    // Save meter validation to Firebase
-    const contractId = contractNumber.replace(/\//g, '_');
-    if (meterValidation) {
-      await db.collection('web_scrape_results').doc(contractId).set({
-        meter_validation_result: meterValidation,
-        utility_raw: utilityRaw,
-        meter_check_timestamp: new Date()
-      }, { merge: true });
-      
-      console.log('[Meter Check] Results saved to Firebase');
-    }
-
-    console.log('[Meter Check] Final meterValidation before response:', meterValidation);
-    console.log('[Meter Check] meterValidation type:', typeof meterValidation);
-    console.log('[Meter Check] meterValidation isArray:', Array.isArray(meterValidation));
-
-    res.json({
-      success: true,
-      meterValidation: meterValidation,
-      message: 'Meter check completed successfully'
-    });
-
-  } catch (err) {
-    console.error('[Meter Check] Error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Meter check failed',
-      error: err.message
-    });
-  }
-});
 
 app.post('/api/scrape-url-test', async (req, res) => {
   const { systemType, username, password, contractNumber } = req.body;
@@ -4272,8 +2747,6 @@ app.post('/api/scrape-url-test', async (req, res) => {
     } else {
       browser = await puppeteer.launch({ headless: false });
       page = await browser.newPage();
-      page.setDefaultTimeout(0); // Disable all timeouts
-      page.setDefaultNavigationTimeout(0); // Disable navigation timeouts
       await page.goto('https://mall-management.lotuss.com/Simplicity/apptop.aspx', { waitUntil: 'networkidle2' });
 
       await page.waitForSelector('#lblToLoginPage', { timeout: 20000 });

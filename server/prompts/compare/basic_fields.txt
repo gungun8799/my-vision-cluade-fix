@@ -1,0 +1,38 @@
+Compare basic fields between PDF and Web sources. Return JSON array of comparison results.
+
+Compare these fields with flexible matching (allow contextual similarity, different formats):
+
+"Building Name" - If field "อยู่กองทรัสต์หรือไม่" is "Yes", just validate as valid (contains word "ซีพี")
+
+"Brand Name" - ชื่อร้าน or brand name comparison
+
+"Customer Name" - Compare customer names
+
+"Customer Address" - If contract number contains "LR": mark as Match regardless. Otherwise compare addresses
+
+"Unit ID" - Format PXXXX comparison  
+
+"Space (NLA)" - Area in square meters comparison
+
+"Tenant Type" - Find near Unit Number starting with "PN", extract descriptive portion after dash. For web: extract after "PN7 -", for example "PN7 - PN Furniture" → "Furniture"
+
+"Proposed lease commencement date" - Compare as calendar dates
+
+"Proposed lease expiry date" - Compare as calendar dates
+
+Flexible comparison rules:
+- Match contextually similar values even if formatted differently
+- Examples: "March 10, 2025" vs "10/03/2025", "$1,000.00" vs "1000", "ซีพี" vs "CP"
+- Handle differences in commas, units like "THB", date formats
+- If value missing in either source: mark match as false
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "pdf": "PDF value",
+    "web": "Web value", 
+    "match": true or false,
+    "reason": "Explanation of match/mismatch"
+  }
+]

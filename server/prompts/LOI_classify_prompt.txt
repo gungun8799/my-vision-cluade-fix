@@ -1,12 +1,48 @@
-อ่านเฉพาะข้อความในหน้า 1 ของไฟล์ PDF นี้ แล้วระบุประเภทของสัญญาตามเงื่อนไขต่อไปนี้:
+Analyze the following contract text and classify the contract type.
 
-- หากพบคำว่า "สัญญาจองเช่าพื้นที่" ให้ตั้งค่า "Contract Type" เป็น "Permanent_fixed"
-- หากพบคำว่า "สัญญาบริการพื้นที่" ให้ตั้งค่า "Contract Type" เป็น "service_express"
-- หากไม่พบข้อความข้างต้น ให้ตั้งค่า "Contract Type" เป็น "Unknown"
+**Contract Classification Rules:**
 
-ตอบกลับด้วย JSON เท่านั้น เช่น:
+**PRIMARY RULE - Thai Contract Type Indicators:**
+- If contract contains "สัญญาบริการพื้นที่" → classify as "service_express"  
+- If contract contains "สัญญาจองเช่าพื้นที่" → classify as "permanent_fixed"
 
+**SECONDARY RULES - English indicators:**
+- If contract contains "Service Express" → classify as "service_express"
+- If contract contains "Permanent Fixed" → classify as "permanent_fixed"
+
+**TERTIARY RULES - Structure analysis (only if no explicit indicators found):**
+
+1. **Service Express Contracts**:
+   - Simple lease structure with consistent monthly charges
+   - No year-by-year rental escalations
+   - Fixed monthly rental and service charges throughout the lease term
+
+2. **Permanent Fixed Contracts**:
+   - Complex lease structure with year-by-year terms
+   - Multiple years with different rental rates per year
+   - Rental escalations or changes year over year
+   - Detailed breakdown of charges for Year 1, Year 2, Year 3, etc.
+
+**Analysis Instructions:**
+1. **FIRST**: Search for Thai contract type indicators: "สัญญาบริการพื้นที่" or "สัญญาจองเช่าพื้นที่"
+2. **SECOND**: Look for English indicators: "Service Express" or "Permanent Fixed"
+3. **THIRD**: Check explicit "Lease Type" field if present
+4. **FOURTH**: If no explicit indicators found, analyze lease structure complexity
+5. **LAST**: Consider lease term structure and charge variations as tiebreaker
+
+**Response Format:**
+Return ONLY a JSON object with this exact structure:
+```json
 {
-  "Contract Type": "Permanent_fixed",
-  "Contract Number": "5036/LO2502/00060"
+  "contractType": "service_express" or "permanent_fixed",
+  "confidence": "high" or "medium" or "low",
+  "reasoning": "Brief explanation of classification decision"
 }
+```
+
+**Examples:**
+- If you see "สัญญาจองเช่าพื้นที่" → "permanent_fixed" with "high" confidence
+- If you see "สัญญาบริการพื้นที่" → "service_express" with "high" confidence
+- If you see "Service Express" or "Permanent Fixed" → use that type with "high" confidence
+- If you see "Year 1: 15,000 THB, Year 2: 16,000 THB" → "permanent_fixed" with "medium" confidence
+- If you see consistent monthly rates throughout → "service_express" with "medium" confidence

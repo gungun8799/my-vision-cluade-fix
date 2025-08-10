@@ -1,0 +1,46 @@
+Validate data completeness for SERVICE EXPRESS contracts from WEB scraped data. Return JSON array of validation results.
+
+Web data completeness validation (different from PDF validation):
+
+"Lease Terms Completeness" - Validate all required lease term fields are present in web data
+
+"Financial Data Completeness" - Validate rental rates, deposits, and charges are complete
+
+"Unit Information Completeness" - Validate unit details, space, and property type are present
+
+"Date Information Completeness" - Validate lease start/end dates are complete and logical
+
+"Contact Information Completeness" - Validate customer and tenant information is complete
+
+"Utility Information Completeness" - Validate utility charges and Include Utility logic is complete
+
+**WEB-SPECIFIC COMPLETENESS RULES:**
+- Web data may not contain signature information (not required for web validation)
+- Web data may not contain citizen ID details (not available via web scraping)
+- Focus on lease and financial information completeness
+- Validate web session captured all required business data
+
+**SERVICE EXPRESS SPECIFIC:**
+- Simple lease terms (no year-by-year complexity)
+- Utility charges completeness critical for Service Express
+- Include Utility field logic validation (Yes/No based on utility charges)
+
+**LO/LR COMPLETENESS VARIATIONS:**
+- **LR CONTRACT RULE**: Renewal contracts may reference previous lease data
+- **LO CONTRACT RULE**: New lease offers require complete standalone data
+
+**WEB DATA QUALITY CHECKS:**
+- No missing critical fields that should be available via web scraping
+- No placeholder or default values that indicate incomplete extraction
+- Consistent data format across all extracted fields
+- Special focus on utility-related data completeness
+
+Return format:
+[
+  {
+    "field": "Data completeness category",
+    "value": "Summary of completeness status",
+    "valid": true or false,
+    "reason": "Completeness validation explanation"
+  }
+]

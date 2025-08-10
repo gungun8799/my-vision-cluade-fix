@@ -1,0 +1,36 @@
+Validate deposit requirements for LO (Lease Offer) contracts.
+
+--- LO CONTRACT DEPOSIT VALIDATION ---
+• LO contracts are new lease offers requiring stricter deposit validation
+• Multiple deposit rules may apply based on tenant and building status
+
+Validation Rules:
+
+"Total Rent Deposit":
+• **Priority Rule**: Big Tenant Override
+  – If Customer in bigtenant.xlsx → deposit must be ≥ 3 × Monthly rental rate
+  – If deposit < rate × 3 → invalid, reason: "Customer in bigtenant list; deposit must be at least 3 × monthly rate"
+
+• **LO Special Rule**: Tenant Selection Check
+  – If Contract Number contains "LO" AND "Tenant Selection" = "No" → deposit must be ≥ 4 × rate
+  – If deposit < rate × 4 → invalid, reason: "LO contract with Tenant Selection=No requires 4 × monthly rate deposit"
+
+• **Building Rule**: Master_9_cell Check
+  – If Building ID exists in Master_9_cell.xlsx → deposit may be ≥ 2 × rate
+  – If deposit < rate × 2 → invalid, reason: "Building requires minimum 2 × monthly rate deposit"
+
+• **Default Rule**: Standard Deposit
+  – Deposit must be ≥ 3 × rate
+  – If deposit < rate × 3 → invalid, reason: "Standard deposit requirement: 3 × monthly rate"
+
+Return validation result in JSON format:
+```json
+[
+  {
+    "field": "Total Rent Deposit",
+    "value": "45000",
+    "valid": true,
+    "reason": "LO contract meets 4 × monthly rate requirement (15000 × 4 = 60000)"
+  }
+]
+```

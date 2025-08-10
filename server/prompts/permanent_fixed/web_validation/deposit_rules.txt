@@ -1,0 +1,133 @@
+Validate deposit, monthly rate, and utility rules. Return JSON array of validation results for ALL fields listed below.
+
+**IMPORTANT**: 
+- Use MONTHLY rental/service rates for calculations, not annual. Ensure mathematical accuracy in all comparisons.
+- This is WEB validation - do NOT reference PDF-specific rules like "bigtenant.xlsx" or "Master_9_cell.xlsx"
+- Validate deposits separately for rental and service components
+- MUST validate ALL fields listed, including utilities and tenancy deposit
+
+**MONTHLY RATE VALIDATION:**
+"Monthly Rental Rate" - Extract and validate monthly rental amount from web data. Must be present as numerical value.
+"Monthly Service Rate" - Extract and validate monthly service charge amount from web data. Must be present as numerical value.
+
+**DEPOSIT BREAKDOWN VALIDATION:**
+"Rental Deposit" Rules (apply in order, stop at first match):
+
+1. **Low Rent Exception**: If monthly_rental_rate < 5000
+   - Calculate: expected = 1 × monthly_rental_rate
+   - If rental_deposit < expected: ❌ Invalid "Monthly Rental Rate (<monthly_rental_rate>) < 5000; Rental Deposit (<rental_deposit>) is less than required 1 × rate = <expected>"
+   - Else: ✅ Valid "Monthly Rental Rate (<monthly_rental_rate>) < 5000; Rental Deposit (<rental_deposit>) ≥ 1 × rate = <expected>"
+
+2. **ATM SCB Exception**: If "Brand Name" contains "ATM SCB" (case-insensitive)
+   - If rental_deposit == 0: ✅ Valid "Brand Name contains ATM SCB; Rental Deposit may be zero"
+   - Else: ✅ Valid "Brand Name contains ATM SCB; Rental Deposit (<rental_deposit>) is acceptable (≥ 0)"
+
+3. **ATM KBANK & Go Fresh Exception**: If "Brand Name" contains "ATM KBANK" AND "Property Type" is "Go Fresh"
+   - Calculate: expected = 1 × monthly_rental_rate
+   - If rental_deposit < expected: ❌ Invalid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Rental Deposit (<rental_deposit>) is less than 1 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+   - Else: ✅ Valid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Rental Deposit (<rental_deposit>) ≥ 1 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+
+4. **Non-Hypermarket Exception**: If "Property Type" is NOT "Hypermarket"
+   - Calculate: expected = 2 × monthly_rental_rate
+   - If rental_deposit < expected: ❌ Invalid "Property Type is not Hypermarket; Rental Deposit (<rental_deposit>) is less than 2 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+   - Else: ✅ Valid "Property Type is not Hypermarket; Rental Deposit (<rental_deposit>) ≥ 2 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+
+5. **Default Rule**: 
+   - Calculate: expected = 3 × monthly_rental_rate
+   - If rental_deposit < expected: ❌ Invalid "Rental Deposit (<rental_deposit>) is less than 3 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+   - Else: ✅ Valid "Rental Deposit (<rental_deposit>) ≥ 3 × Monthly Rental Rate (<monthly_rental_rate>) = <expected>"
+
+"Service Deposit" Rules (apply same logic with service rates):
+
+1. **Low Service Rate Exception**: If monthly_service_rate < 5000
+   - Calculate: expected = 1 × monthly_service_rate
+   - If service_deposit < expected: ❌ Invalid "Monthly Service Rate (<monthly_service_rate>) < 5000; Service Deposit (<service_deposit>) is less than required 1 × rate = <expected>"
+   - Else: ✅ Valid "Monthly Service Rate (<monthly_service_rate>) < 5000; Service Deposit (<service_deposit>) ≥ 1 × rate = <expected>"
+
+2. **ATM SCB Exception**: If "Brand Name" contains "ATM SCB" (case-insensitive)
+   - If service_deposit == 0: ✅ Valid "Brand Name contains ATM SCB; Service Deposit may be zero"
+   - Else: ✅ Valid "Brand Name contains ATM SCB; Service Deposit (<service_deposit>) is acceptable (≥ 0)"
+
+3. **ATM KBANK & Go Fresh Exception**: If "Brand Name" contains "ATM KBANK" AND "Property Type" is "Go Fresh"
+   - Calculate: expected = 1 × monthly_service_rate
+   - If service_deposit < expected: ❌ Invalid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Service Deposit (<service_deposit>) is less than 1 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+   - Else: ✅ Valid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Service Deposit (<service_deposit>) ≥ 1 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+
+4. **Non-Hypermarket Exception**: If "Property Type" is NOT "Hypermarket"
+   - Calculate: expected = 2 × monthly_service_rate
+   - If service_deposit < expected: ❌ Invalid "Property Type is not Hypermarket; Service Deposit (<service_deposit>) is less than 2 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+   - Else: ✅ Valid "Property Type is not Hypermarket; Service Deposit (<service_deposit>) ≥ 2 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+
+5. **Default Rule**: 
+   - Calculate: expected = 3 × monthly_service_rate
+   - If service_deposit < expected: ❌ Invalid "Service Deposit (<service_deposit>) is less than 3 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+   - Else: ✅ Valid "Service Deposit (<service_deposit>) ≥ 3 × Monthly Service Rate (<monthly_service_rate>) = <expected>"
+
+**UTILITY FIELDS VALIDATION:**
+"Include Utility" - Must be present as "Yes" or "No" value. Validate that utility inclusion status is clearly specified.
+
+"Utilities (water)" - If Include Utility is "Yes", validate water charge is present and numeric. If "No", should be 0 or null.
+
+"Utilities (Electricity)" - If Include Utility is "Yes", validate electricity charge is present and numeric. If "No", should be 0 or null.
+
+"Utilities (Gas)" - If Include Utility is "Yes", validate gas charge is present and numeric. If "No", should be 0 or null.
+
+"Tenancy Deposit" - Validate total deposit amount equals sum of rental and service deposits. Must be numeric and positive.
+
+Return format:
+[
+  {
+    "field": "Monthly Rental Rate",
+    "value": "Extracted monthly rental amount",
+    "valid": true or false,
+    "reason": "Validation result for monthly rental rate"
+  },
+  {
+    "field": "Monthly Service Rate", 
+    "value": "Extracted monthly service amount",
+    "valid": true or false,
+    "reason": "Validation result for monthly service rate"
+  },
+  {
+    "field": "Rental Deposit",
+    "value": "Extracted rental deposit amount",
+    "valid": true or false,
+    "reason": "Rental deposit validation with calculation details"
+  },
+  {
+    "field": "Service Deposit",
+    "value": "Extracted service deposit amount", 
+    "valid": true or false,
+    "reason": "Service deposit validation with calculation details"
+  },
+  {
+    "field": "Tenancy Deposit",
+    "value": "Total deposit amount (rental + service)",
+    "valid": true or false,
+    "reason": "Total tenancy deposit validation"
+  },
+  {
+    "field": "Include Utility",
+    "value": "Yes or No",
+    "valid": true or false,
+    "reason": "Utility inclusion status validation"
+  },
+  {
+    "field": "Utilities (water)",
+    "value": "Water utility charge or 0",
+    "valid": true or false,
+    "reason": "Water utility validation based on Include Utility status"
+  },
+  {
+    "field": "Utilities (Electricity)",
+    "value": "Electricity utility charge or 0",
+    "valid": true or false,
+    "reason": "Electricity utility validation based on Include Utility status"
+  },
+  {
+    "field": "Utilities (Gas)",
+    "value": "Gas utility charge or 0",
+    "valid": true or false,
+    "reason": "Gas utility validation based on Include Utility status"
+  }
+]

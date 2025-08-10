@@ -1,0 +1,43 @@
+Compare lease terms between PDF and Web sources. Return JSON array of comparison results.
+
+**INTELLIGENT DATE COMPARISON:**
+When comparing dates, MUST handle different calendar systems and formats:
+
+- Thai Buddhist dates (e.g., "30 มิถุนายน 2570") = Gregorian dates - 543 years
+- Convert Buddhist years to Gregorian: 2570 - 543 = 2027
+- "30 มิถุนายน 2570" = "30-Jun-2027" = EXACT MATCH
+- Compare actual calendar dates, not text format
+- Account for different date formats: "DD-MMM-YYYY", "DD/MM/YYYY", Thai Buddhist format
+
+**CRITICAL**: If dates represent the same calendar date after conversion, set "match": true regardless of format differences
+
+Compare these fields:
+
+"Lease Type" - For Service Express contracts, always compare as "Service Express"
+
+"Billing Frequency" - If contract number contains "LR": mark as Match if Web info is NULL, otherwise compare normally
+
+"Monthly charge" - Output "Yes" or "No" comparison
+
+Service Express typically has simple lease terms without year-by-year variations:
+
+"Charge Type" - Compare meaning: both fixed rate OR both variable rate = match
+"Monthly Amount of rent" - Compare numeric values, match if same amount
+"Monthly Amount of service" - Compare numeric values, match if same amount
+"Deposit Amount" - Compare numeric amounts
+
+**EXAMPLE DATE CONVERSIONS:**
+- "30 มิถุนายน 2570" = "30-Jun-2027" → MATCH ✅
+- "1 กรกฎาคม 2568" = "01-Jul-2025" → MATCH ✅
+- Handle Thai months: มกราคม=Jan, กุมภาพันธ์=Feb, มีนาคม=Mar, เมษายน=Apr, พฤษภาคม=May, มิถุนายน=Jun, กรกฎาคม=Jul, สิงหาคม=Aug, กันยายน=Sep, ตุลาคม=Oct, พฤศจิกายน=Nov, ธันวาคม=Dec
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation of comparison logic (mention calendar conversion if applicable)"
+  }
+]

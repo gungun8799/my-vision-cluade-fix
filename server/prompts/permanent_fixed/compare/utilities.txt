@@ -1,0 +1,30 @@
+Compare utility information between PDF and Web sources for PERMANENT FIXED contracts. Return JSON array of comparison results.
+
+Compare these fields:
+
+"Include Utility" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match regardless of matching string. Otherwise compare normally.
+
+"Utilities charge (water)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts
+
+"Utilities charge (Electricity)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts  
+
+"Utilities charge (cooking gas)" - **TRUST FUND RULE**: If field "อยู่กองทรัสต์หรือไม่" is "Yes", mark as match. Otherwise compare numeric amounts
+
+Special Trust Fund Rules:
+- If "อยู่กองทรัสต์หรือไม่" = "Yes", all utility fields automatically match regardless of values
+- This overrides normal comparison logic for utility-related fields
+
+Normal Comparison (when not trust fund):
+- Compare numeric values for utility charges
+- "Include Utility" should be "Yes" if any utility charge > 0, "No" if all are 0
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "pdf": "PDF value",
+    "web": "Web value",
+    "match": true or false, 
+    "reason": "Trust fund override OR normal comparison explanation"
+  }
+]

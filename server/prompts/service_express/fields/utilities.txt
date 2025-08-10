@@ -1,0 +1,18 @@
+Extract utility information for SERVICE EXPRESS contracts and return in JSON format.
+
+Required fields:
+"Include Utility" - Output must be exactly "Yes" or "No."
+
+SERVICE EXPRESS UTILITY LOGIC:
+• Check these three utility charge fields:
+  – "Utilities charge (water)"
+  – "Utilities charge (Electricity)"  
+  – "Utilities charge (cooking gas)"
+• If **all three** utility charges are zero (0.00, 0, or missing), return **"No"**
+• If **any** of the three utility charges has a value greater than zero, return **"Yes"**
+
+"Utilities charge (water)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00
+
+"Utilities charge (Electricity)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00
+
+"Utilities charge (cooking gas)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00

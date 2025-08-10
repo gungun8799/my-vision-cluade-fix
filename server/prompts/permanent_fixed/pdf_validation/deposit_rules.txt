@@ -1,0 +1,33 @@
+Validate deposit rules and return JSON array of validation results.
+
+"Tenancy Deposit" Rules (apply in order, stop at first match):
+
+1. **Low Rent Exception**: If rent < 5000
+   - If deposit < 1 × rent: ❌ Invalid "Net Rent (<rent>) < 5000; Tenancy Deposit (<deposit>) is less than required 1 × rent (=<rent>)"
+   - Else: ✅ Valid "Net Rent (<rent>) < 5000; Tenancy Deposit (<deposit>) ≥ 1 × rent (=<rent>)"
+
+2. **ATM SCB Exception**: If "Brand Name" contains "ATM SCB" (case-insensitive)
+   - If deposit == 0: ✅ Valid "Brand Name contains ATM SCB; Tenancy Deposit may be zero"
+   - Else: ✅ Valid "Brand Name contains ATM SCB; Tenancy Deposit (<deposit>) is acceptable (≥ 0)"
+
+3. **ATM KBANK & Go Fresh Exception**: If "Brand Name" contains "ATM KBANK" AND "Property Type" is "Go Fresh"
+   - If deposit < 1 × rent: ❌ Invalid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Tenancy Deposit (<deposit>) is less than 1 × Net Rent (=<rent>)"
+   - Else: ✅ Valid "Brand Name contains ATM KBANK and Property Type is Go Fresh; Tenancy Deposit (<deposit>) ≥ 1 × Net Rent (=<rent>)"
+
+4. **Non-Hypermarket Exception**: If "Property Type" is NOT "Hypermarket"
+   - If deposit < 2 × rent: ❌ Invalid "Property Type is not Hypermarket; Tenancy Deposit (<deposit>) is less than 2 × Net Rent (=<expected>)"
+   - Else: ✅ Valid "Property Type is not Hypermarket; Tenancy Deposit (<deposit>) ≥ 2 × Net Rent (=<expected>)"
+
+5. **Default Rule**: 
+   - If deposit < 3 × rent: ❌ Invalid "Tenancy Deposit (<deposit>) is less than 3 × Net Rent (=<expected>)"
+   - Else: ✅ Valid "Tenancy Deposit (<deposit>) ≥ 3 × Net Rent (=<expected>)"
+
+Return format:
+[
+  {
+    "field": "Tenancy Deposit",
+    "value": "Extracted value",
+    "valid": true or false,
+    "reason": "Explanation with amounts and rules applied"
+  }
+]

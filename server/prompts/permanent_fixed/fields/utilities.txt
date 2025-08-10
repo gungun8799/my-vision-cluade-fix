@@ -1,0 +1,14 @@
+Extract utility information for PERMANENT FIXED contracts and return in JSON format.
+
+Required fields:
+"Include Utility" - Output "Yes" or "No". For permanent fixed contracts, "Yes" if any of "Utilities charge (water)", "Utilities charge (Electricity)", "Utilities charge (cooking gas)" has non-zero value
+
+"Utilities charge (water)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00
+
+"Utilities charge (Electricity)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00
+
+"Utilities charge (cooking gas)" - On web check "Meter Type" column and extract number from "Tariff as at Contract Start Date" column. If nothing found, put 0.00
+
+Permanent Fixed utility rules:
+- If any of the three utility charges is non-zero, return "Include Utility" as "Yes"
+- If all three are exactly 0.00 (or missing), return "Include Utility" as "No"

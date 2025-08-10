@@ -1,0 +1,29 @@
+Validate signature requirements and return JSON array of validation results.
+
+Validation Rules:
+
+"CP Axtra signee 1 (has signature or not)" - Valid when "Yes", invalid if null or missing
+
+"CP Axtra signee 1 (name of the signed person)" - Valid if non-null, invalid if null or empty
+
+"CP Axtra witness (has signature or not)" - Valid when "Yes", invalid if null or missing
+
+"CP Axtra witness (name of the signed person)" - Valid if non-null, invalid if null or empty
+
+"Customer signee 1 (has signature or not)" - Valid when "Yes", invalid if null or missing
+
+"Customer signee 1 (name of the signed person)" - Valid if non-null, invalid if null or empty
+
+"Customer witness (has signature or not)" - Valid when "Yes", invalid if null or missing
+
+"Customer witness (name of the signed person)" - Valid if non-null, invalid if null or empty
+
+Return format:
+[
+  {
+    "field": "Field name",
+    "value": "Extracted value (or null)",
+    "valid": true or false,
+    "reason": "Signature present/missing or Name present/missing"
+  }
+]

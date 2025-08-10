@@ -1,0 +1,63 @@
+Extract lease terms for PERMANENT FIXED contracts and return in JSON format.
+
+**INTELLIGENT YEAR ALLOCATION LOGIC:**
+When extracting Year-by-Year details, MUST intelligently calculate year boundaries:
+
+FOR PDF SOURCES:
+- Extract actual year-by-year terms as specified in contract sections
+- Each year should have exactly 12 months (1 year) duration
+
+FOR WEB SOURCES (Simplicity system):
+- Use "Proposed lease commencement date" and "Proposed lease expiry date" to calculate total duration
+- Divide total lease duration into equal 1-year periods
+- Calculate year boundaries intelligently:
+  * Year 1: Start = Proposed commencement date, End = Start date + 11 months + 30 days
+  * Year 2: Start = Year 1 End date + 1 day, End = Start date + 11 months + 30 days  
+  * Year 3: Start = Year 2 End date + 1 day, End = Proposed expiry date (or calculated)
+
+**DYNAMIC YEAR INCLUSION:**
+- Only include years that actually exist in the contract duration
+- If lease is 2 years total, only show Year 1 and Year 2
+- If lease is 1 year total, only show Year 1
+- Do NOT include Year 3 unless contract actually spans 3+ years
+
+Required fields:
+"Lease Type" - Check section "4. ค่าเช่าและบริการ" to determine if payment condition is "Permanent Fixed" or not
+
+"Lease property tax rate" - Check for formats like "PTS - PT Standard", "PT - MALL", or numbers "10", "12.5"
+
+"Monthly charge" - Output "Yes" or "No"
+
+**AMOUNT ALLOCATION RULES:**
+FOR PDF SOURCES: Extract year-specific amounts if they exist
+FOR WEB SOURCES: Use same base amounts for all years unless explicitly different
+
+**AMOUNT EXTRACTION PRIORITY (Web):**
+1. Look for "Monthly Rent" or "Rental Amount" in main lease details (NOT per-square-meter rates)
+2. Look for "Service Charge" or "Service Fee" amounts (NOT per-square-meter rates) 
+3. If you find per-square-meter rates (e.g., "101.4024 per sqm"), multiply by total area to get monthly amount
+4. If only total amounts found, divide by number of years
+5. Ensure amounts are in Thai Baht (THB) - typical range: 5,000-50,000 THB/month
+6. **WARNING:** If extracted amount seems too small (under 1,000 THB), it might be per-sqm rate - recalculate
+
+Year-by-Year Contract Details (ONLY extract years that exist in contract duration):
+"Year 1 : Contract Start date" - For web: use Proposed lease commencement date
+"Year 1 : Contract End date" - For web: calculate start date + 1 year - 1 day
+"Year 1 : Charge Type" - From section "4.ค่าเช่าและค่าบริการ" if "Fixed rate" or "Not Fixed rate"
+"Year 1 : Monthly Amount of rent" - **WEB:** Use main "Monthly Rent" amount (THB), NOT per-sqm rates
+"Year 1 : Monthly Amount of service" - **WEB:** Use main "Service Charge" amount (THB), NOT per-sqm rates
+
+"Year 2 : Contract Start date" - For web: Year 1 end date + 1 day (ONLY if contract duration > 1 year)
+"Year 2 : Contract End date" - For web: Year 2 start date + 1 year - 1 day
+"Year 2 : Charge Type" - From section "4.ค่าเช่าและค่าบริการ" if "Fixed rate" or "Not Fixed rate"  
+"Year 2 : Monthly Amount of rent" - **SMART ALLOCATION:** Use Year 1 amount unless explicitly different in contract
+"Year 2 : Monthly Amount of service" - **SMART ALLOCATION:** Use Year 1 amount unless explicitly different in contract
+
+"Year 3 : Contract Start date" - For web: Year 2 end date + 1 day (ONLY if contract duration > 2 years)
+"Year 3 : Contract End date" - For web: Year 3 start date + 1 year - 1 day OR Proposed lease expiry date
+"Year 3 : Charge Type" - From section "4.ค่าเช่าและค่าบริการ" if "Fixed rate" or "Not Fixed rate"
+"Year 3 : Monthly Amount of rent" - **SMART ALLOCATION:** Use Year 1 amount unless explicitly different in contract
+"Year 3 : Monthly Amount of service" - **SMART ALLOCATION:** Use Year 1 amount unless explicitly different in contract
+
+"Total Rent Deposits" - Total rental deposit amount
+"Total Service Deposits" - Total service deposit amount

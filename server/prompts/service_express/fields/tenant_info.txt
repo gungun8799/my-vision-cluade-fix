@@ -1,0 +1,20 @@
+Extract tenant-related information and return in JSON format.
+
+Required fields:
+"Tenant Type" - Usually located near Unit Number starting with "PN". Extract text after first dash "-". Example: "PN3 - PN Car Service & Maintenance" → return "PN Car Service & Maintenance". If no "PN" prefix, still extract text after dash.
+
+"Tenant selection" - Put "No" for now
+
+"Big Tenant" - Put "No" for now
+
+"Space Design Type" - Space design classification
+
+"Billing Options" - Select "Calendar Month" or "Anniversary Month"
+
+"Billing Frequency" - Billing frequency (e.g., Monthly)
+
+"Payment Term" - Payment terms
+
+"Monthly rental rate" - Monthly rent amount
+
+"Rental Ratio" - Rental ratio percentage

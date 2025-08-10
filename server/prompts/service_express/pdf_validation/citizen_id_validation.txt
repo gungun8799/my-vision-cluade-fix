@@ -1,0 +1,50 @@
+Validate citizen ID requirements and return JSON array of validation results.
+
+Validation Rules:
+
+**STEP 1: Determine Customer Type**
+"Individual or Corporate" - Analyze "Customer Name": if clearly person's name (given name + surname, no business identifiers) = "Individual"; if contains business terms like "Co.", "Ltd.", "Inc.", "Corporation" = "Corporate"; if uncertain = "—"
+
+**STEP 2: Apply Validation Based on Customer Type**
+
+**FOR INDIVIDUAL CUSTOMERS:**
+- "Citizen ID Number" - Must be exactly 13 digits (ignore whitespace, dash, separators, count only numbers). Valid if matches /^\d{13}$/
+- "Citizen ID expiration date" - Valid if expiration date is at least 6 months in future from today
+- "Name on Citizen ID card" - Verify ID card name matches "Customer Name" exactly (ignore initials like นาย นางสาว น.ส., check actual name). Match = "Yes"/valid, no match = "No"/invalid
+- "Address on Citizen ID card" - Valid if non-null, invalid if null or empty
+- "แนบหนังสือรับรองบริษัท" - Mark as "—" (not applicable for individuals)
+- "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่" - Mark as "—" (not applicable for individuals)
+
+**FOR CORPORATE CUSTOMERS:**
+
+**DOCUMENT SECTION TARGETING:** For company certificate fields (Company Registration Number, Company Certificate issued date, Names on Company Certificate), focus ONLY on the BOTTOM 2/3 of the document (counting from the bottom page upward). This is where company certificate information is typically located. Ignore content in the top 1/3 of the document to avoid confusion.
+
+- "แนบหนังสือรับรองบริษัท" - Check if PDF includes corporate certificate document or "หนังสือรับรองความเป็นนิติบุคคล": present = "Yes"/valid, absent = "No"/invalid
+- "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่" - **ENHANCED STAMP DETECTION:** ALWAYS perform stamp detection when PDF is provided. Look carefully in the BOTTOM 2/3 of the document for ANY of these stamp indicators on the company certificate: circular/round stamps, official seals, embossed marks, red ink stamps, government department stamps, "ตรา" marks, raised impressions, or any official marking that appears to be a company/authority stamp. Even faint, partially visible, or watermarked stamps count as valid. If ANY stamp-like marking is detected: "Yes"/valid, only if completely absent: "No"/invalid
+- "Authorized Signatory Match" - Check if the signee name matches the authorized signatory name indicated on the corporate certificate: match = "Yes"/valid, no match = "No"/invalid
+- "Citizen ID Number" - **FOR CORPORATE**: Extract 13-digit number from attached citizen ID card in the PDF. This should be exactly 13 digits from the individual citizen ID card document. Valid if exactly 13 digits, invalid otherwise. Reason: "Corporate customer - citizen ID from attached ID card: [13-digit number]"
+- "Name on Citizen ID card" - **FOR CORPORATE**: Check if the name on the citizen ID card matches any authorized signatory name listed on the company certificate (search in BOTTOM 2/3 of document for "ผู้มีอำนาจลงนาม" or similar context). Valid if match found, invalid if no match. Reason: "Name matches authorized signatory on company certificate" or "Name does not match any authorized signatory"
+- "Company Registration Number" - **REGEX-LIKE PATTERN:** Find text matching the pattern "ทะเบียน.*เลข.*[10-15 digits]" then extract only the long numerical sequence (10-15 digits) from that match. Example: from "ทะเบียนนิติบุคคลเลขที่ 0245555001990" extract "0245555001990".
+- "Company Certificate issued date" - **REGEX-LIKE PATTERN:** Find text matching the pattern "ออกให้.*พ.ศ..*[4-digit year]" then extract the complete date. Example: from "ออกให้ ณ วันที่ 17 เดือน เมษายน พ.ศ. 2568" extract the full date, convert Buddhist year to Gregorian (2568-543=2025). Check if issued date is NOT more than 6 months from current date.
+- "Names on Company Certificate" - **REGEX-LIKE PATTERN:** Find all lines matching the pattern "นาย.*[Thai surname]" that appear after "กรรมการ" context. Example: extract lines like "1. นายวิชัย เสริมศักดิ์ศศิธร", "2. นายธานินทร์ เสริมศักดิ์ศศิธร", etc. Extract ALL such names and format as: "1. [Name1], 2. [Name2], 3. [Name3], 4. [Name4], 5. [Name5]"
+- "Company Registered Address" - **REGEX-LIKE PATTERN:** Find text matching the pattern "ตั้งอยู่เลขที่.*จังหวัด.*" then extract the complete address. Example: from "ตั้งอยู่เลขที่ 99/1 หมู่ที่ 2 ตำบลบางสมัคร อำเภอบางปลาง จังหวัดฉะเชิงเทรา" extract the full address.
+
+**DYNAMIC FIELD NAMING:**
+- For Individual customers: Use original field names ("Citizen ID Number", "Citizen ID expiration date", "Name on Citizen ID card", "Address on Citizen ID card")  
+- For Corporate customers: Use mixed naming - keep citizen fields for ID validation, use company fields for certificate data:
+  * "Citizen ID Number" (from attached ID card)
+  * "Name on Citizen ID card" (validate against authorized signatories)
+  * "Company Registration Number" (from company certificate)
+  * "Company Certificate issued date" (from company certificate)
+  * "Names on Company Certificate" (from company certificate)
+  * "Company Registered Address" (from company certificate)
+
+Return format:
+[
+  {
+    "field": "Field name (use appropriate naming based on customer type)",
+    "value": "Extracted value (or null)", 
+    "valid": true or false,
+    "reason": "Explanation"
+  }
+]

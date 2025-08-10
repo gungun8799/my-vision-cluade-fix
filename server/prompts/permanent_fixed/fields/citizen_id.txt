@@ -1,0 +1,12 @@
+Extract citizen ID information and return in JSON format.
+
+Required fields:
+"Name on Citizen ID card" - Name as it appears on citizen ID
+
+"Address on Citizen ID card" - Address as it appears on citizen ID
+
+"Citizen ID Number" - 13-digit Thai citizen ID number
+
+"Citizen ID expiration date" - Expiration date of citizen ID
+
+"Workflow status" - Workflow status from: Start, Draft, Pending GTO Update, Pending Approval, Accepted, Rejected (in this order only)

@@ -1,0 +1,32 @@
+Extract basic contract information for PERMANENT FIXED contracts and return in JSON format. Focus on accuracy and extract only what is clearly visible.
+
+Required fields:
+"Building Name" - Extract building name from format like "5066 - บมจ. ซีพี แอ็กซ์ตร้า ปากช่อง (5066)" or "บมจ. ซีพีแอ๊กซ์ตร้าบางปะกอก(5036)", return only the building name part "บมจ. ซีพี แอ็กซ์ตร้า ปากช่อง"
+
+"Building ID" - Extract 4-digit building ID from the same format above
+
+"อยู่กองทรัสต์หรือไม่" - If Building ID starts with "00" put "Yes", otherwise "No"
+
+"แบบสัญญากองทรัสต์" - If "อยู่กองทรัสต์หรือไม่" is "Yes", contract must contain "ทรัสต์เพื่อการลงทุน" or similar phrase to be valid, otherwise always valid
+
+"Contract Number" - Format: "xxxx_LOxxxx_xxxxx" or "xxxx_LRxxxx_xxxxx" (under Opp field, web calls it "lease Offer number" or "lease renewal number")
+
+"Brand Name" - ชื่อร้าน or brand name
+
+"Property Type" - Property type designation
+
+"Customer Name" - Full customer name
+
+"Customer Address" - Customer address
+
+"Individual or Corporate" - Analyze Customer Name: if clearly a person's name (given name + surname, no business identifiers) = "Individual"; if contains business terms like "Co.", "Ltd.", "Inc.", "Corporation" = "Corporate"; if uncertain = "—"
+
+"แนบหนังสือรับรองบริษัท" - If "Individual or Corporate" is "Corporate", check if PDF includes corporate certificate document or "หนังสือรับรองความเป็นนิติบุคคล": present = "Yes", not present = "No". If "Individual" = mark as valid with reason "Individual customer"
+
+"Unit ID" - Format: PXXXX where x is number
+
+"Space (NLA)" - Area in square meters
+
+"Proposed lease commencement date" - Start date of lease
+
+"Proposed lease expiry date" - End date of lease
