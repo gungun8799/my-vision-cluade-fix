@@ -1,4 +1,4 @@
-Extract lease terms for PERMANENT FIXED contracts and return in JSON format.
+Extract lease terms for PERMANENT FIXED contracts and return as a complete JSON object with ALL required fields listed below.
 
 **INTELLIGENT YEAR ALLOCATION LOGIC:**
 When extracting Year-by-Year details, MUST intelligently calculate year boundaries:
@@ -61,3 +61,29 @@ Year-by-Year Contract Details (ONLY extract years that exist in contract duratio
 
 "Total Rent Deposits" - Total rental deposit amount
 "Total Service Deposits" - Total service deposit amount
+
+**CRITICAL**: You MUST return a complete JSON object containing ALL the fields listed above. Do not return partial results or skip fields. If a field cannot be determined, use "NULL" as the value.
+
+**REQUIRED JSON FORMAT:**
+{
+  "Lease Type": "value",
+  "Lease property tax rate": "value", 
+  "Monthly charge": "Yes" or "No",
+  "Year 1 : Contract Start date": "value",
+  "Year 1 : Contract End date": "value",
+  "Year 1 : Charge Type": "value",
+  "Year 1 : Monthly Amount of rent": "value",
+  "Year 1 : Monthly Amount of service": "value",
+  "Year 2 : Contract Start date": "value or NULL if not applicable",
+  "Year 2 : Contract End date": "value or NULL if not applicable", 
+  "Year 2 : Charge Type": "value or NULL if not applicable",
+  "Year 2 : Monthly Amount of rent": "value or NULL if not applicable",
+  "Year 2 : Monthly Amount of service": "value or NULL if not applicable",
+  "Year 3 : Contract Start date": "value or NULL if not applicable",
+  "Year 3 : Contract End date": "value or NULL if not applicable",
+  "Year 3 : Charge Type": "value or NULL if not applicable", 
+  "Year 3 : Monthly Amount of rent": "value or NULL if not applicable",
+  "Year 3 : Monthly Amount of service": "value or NULL if not applicable",
+  "Total Rent Deposits": "value",
+  "Total Service Deposits": "value"
+}

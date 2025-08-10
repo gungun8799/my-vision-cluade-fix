@@ -2507,10 +2507,10 @@ Return format: [{"field":"name","value":"val","valid":true/false,"reason":"brief
     // Add missing web validation fields if categories failed
     if (sourceType === 'web') {
       const expectedWebFields = [
-        "Contract Number", "Workflow status", "Brand Name", "Tenant Type", "Unit ID", "Building ID", 
-        "Property Type", "Space Design Type", "Billing option", "Billing Frequency", "Net Rent (p.m.)", 
-        "Tenancy Deposit", "Payment Term", "Rental Ratio", "Include Utility", "Utilities (water)", 
-        "Utilities (Electricity)", "Utilities (Gas)"
+        "Contract Number", "Customer Name", "Brand Name", "Building Name", "Unit ID", "Space (NLA)", 
+        "Monthly Rental Rate", "Lease Type", "Building ID", "อยู่กองทรัสต์หรือไม่", "Customer Type", 
+        "Space Design Type", "Unit Status", "Proposed lease commencement date", "Proposed lease expiry date", 
+        "Monthly Service Rate", "Rental Deposit", "Service Deposit"
       ];
       
       const currentFields = allValidationResults.map(r => r.field || r.issue || '');

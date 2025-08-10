@@ -1078,6 +1078,10 @@ const getContractDate = (ts) => {
                     <tbody>
                       {(contract.validation_result || [])
                         .filter(row => {
+                          // Hide Net Rent (p.m.) field
+                          if (row.field === 'Net Rent (p.m.)') {
+                            return false;
+                          }
                           // Hide NULL year rows
                           if ((row.field?.includes('Year 2') || row.field?.includes('Year 3')) && 
                               (!row.value || row.value === 'NULL' || row.value === null || row.value === '')) {
@@ -1109,6 +1113,11 @@ const getContractDate = (ts) => {
                     <tbody>
                       {(contract.web_validation_result || [])
                         .filter(row => {
+                          // Hide data completeness fields
+                          if (row.field?.toLowerCase().includes('data completeness') || 
+                              row.field?.toLowerCase().includes('completeness')) {
+                            return false;
+                          }
                           // Hide NULL year rows
                           if ((row.field?.includes('Year 2') || row.field?.includes('Year 3')) && 
                               (!row.value || row.value === 'NULL' || row.value === null || row.value === '')) {
