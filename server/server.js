@@ -32,12 +32,31 @@ function stripThinkTags(response) {
   // First, remove properly closed <think>...</think> tags
   let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
   
-  // For unclosed think tags, try to preserve JSON content that comes after
+  // Handle unclosed think tags more aggressively
   if (cleaned.includes('<think>')) {
     console.log('[DEBUG stripThinkTags] Found unclosed think tag');
     
-    // Remove the unclosed think tag and everything before it
-    cleaned = cleaned.replace(/^[\s\S]*?<think>[\s\S]*?(?=[\[\{])/i, '');
+    // Try multiple approaches to find JSON after think tag
+    const thinkPos = cleaned.indexOf('<think>');
+    const textAfterThink = cleaned.substring(thinkPos);
+    
+    // Look for JSON patterns after the think tag
+    const jsonArrayMatch = textAfterThink.match(/(\[[\s\S]*?\])/);
+    const jsonObjectMatch = textAfterThink.match(/(\{[\s\S]*?\})/);
+    
+    if (jsonArrayMatch) {
+      console.log('[DEBUG stripThinkTags] Found JSON array after think tag');
+      cleaned = jsonArrayMatch[1];
+    } else if (jsonObjectMatch) {
+      console.log('[DEBUG stripThinkTags] Found JSON object after think tag');
+      cleaned = jsonObjectMatch[1];
+    } else {
+      // Fallback: remove everything up to first { or [
+      const jsonStart = textAfterThink.search(/[\[\{]/);
+      if (jsonStart !== -1) {
+        cleaned = textAfterThink.substring(jsonStart);
+      }
+    }
   }
   
   // Try to extract valid JSON using bracket/brace counting
@@ -46,6 +65,9 @@ function stripThinkTags(response) {
     console.log('[DEBUG stripThinkTags] Successfully extracted JSON using bracket counting');
     cleaned = extractedJson;
   }
+  
+  // Final cleanup - remove any remaining < characters that might be artifacts
+  cleaned = cleaned.replace(/^[^[{]*/, '');
   
   const result = cleaned.trim();
   console.log('[DEBUG stripThinkTags] Output length:', result.length);
@@ -404,231 +426,7 @@ app.post('/api/extract-text-only', upload.single('file'), async (req, res) => {
 });
 
 
-// ===== OCR Handler =====
-app.post('/api/extract-text', upload.array('files'), async (req, res) => {
-  console.log('Incoming request to /api/extract-text');
-  const files = req.files;
-  const promptKey = req.body.promptKey || req.body.contractType || 'permanent_fixed';
-  const contractType = req.body.contractType || (req.body.promptKey?.includes('service_express') ? 'service_express' : 'permanent_fixed');
-  const selectedPagesRaw = req.body.pages || 'all';
-  const selectedPages = selectedPagesRaw.toLowerCase() === 'all'
-    ? []
-    : selectedPagesRaw.split(',').map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
-
-  if (!files?.length) {
-    console.error('[❌ No files uploaded]');
-    return res.status(400).json({ message: 'No files uploaded' });
-  }
-
-  // Use PromptManager to get legacy-compatible prompt
-  const promptManager = new PromptManager();
-  let promptTemplate;
-  try {
-    promptTemplate = promptManager.createLegacyExtractionPrompt(contractType);
-    console.log(`[✅ Loaded modular extraction prompt for ${contractType}]`);
-  } catch (err) {
-    console.error('[❌ Failed to load extraction prompt]', err);
-    return res.status(400).json({ message: 'Failed to load extraction prompt', error: err.message });
-  }
-
-  let combinedText = '';
-
-  for (const file of files) {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const localFilePath = path.join(__dirname, file.path);
-    const gcsPath = `uploaded/${file.originalname}`;
-    await bucket.upload(localFilePath, { destination: gcsPath });
-    const gcsUri = `gs://${bucket.name}/${gcsPath}`;
-
-    if (ext === '.pdf') {
-      const outputPrefix = `vision-output/${path.parse(file.originalname).name}_${Date.now()}/`;
-
-      const request = {
-        inputConfig: {
-          gcsSource: { uri: gcsUri },
-          mimeType: 'application/pdf',
-        },
-        outputConfig: {
-          gcsDestination: { uri: `gs://${bucket.name}/${outputPrefix}` },
-          batchSize: 5,
-        },
-        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-      };
-      if (selectedPages.length > 0) request.pages = selectedPages;
-
-      console.log('[🔁 OCR] Starting asyncBatchAnnotateFiles...');
-      const [operation] = await visionClient.asyncBatchAnnotateFiles({ requests: [request] });
-      await operation.promise();
-      console.log('[✅ OCR] asyncBatchAnnotateFiles completed');
-
-      const [outputFiles] = await bucket.getFiles({ prefix: outputPrefix });
-      let extracted = '';
-
-      for (const f of outputFiles) {
-        if (!f.name.endsWith('.json')) continue;
-        const [jsonData] = await f.download();
-        const parsed = JSON.parse(jsonData.toString());
-        const responses = parsed.responses || [];
-        responses.forEach((page, i) => {
-          const text = page.fullTextAnnotation?.text || '';
-          extracted += `\n\nFile: ${file.originalname} — Page ${i + 1}\n${text}`;
-        });
-      }
-
-      combinedText += extracted;
-    } else {
-      const [result] = await visionClient.documentTextDetection(localFilePath);
-      const text = result.fullTextAnnotation?.text || '';
-      combinedText += `\n\nFile: ${file.originalname}\n${text}`;
-    }
-
-    console.log('[📥 Upload Check] Files received:', req.files?.length);
-    fs.unlinkSync(localFilePath);
-  }
-
-  // === Gemini Processing ===
-  const finalPrompt = `${promptTemplate}\n\nText:\n${combinedText}`;
-  
-  let geminiText;
-  const maxRetries = 3;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const geminiRes = await model.generateContent({
-        contents: [{ parts: [{ text: finalPrompt }] }],
-        generationConfig: {
-          temperature: 0.1,        // 🔽 Lower = less hallucination
-          topK: 1,
-          topP: 0.8,
-          maxOutputTokens: 5000
-        }
-      });
-      geminiText = await geminiRes.response.text();
-      
-      // Strip think tags first
-      geminiText = stripThinkTags(geminiText);
-      
-      // Check if response is JSON-like
-      if (geminiText && !geminiText.trim().includes('{') && !geminiText.trim().includes('[')) {
-        console.error('[⚠️ Gemini returned plain text instead of JSON, retrying...]');
-        console.error('[📝 Response preview]:', geminiText.substring(0, 200));
-        
-        if (attempt === maxRetries) {
-          throw new Error('Gemini consistently returning plain text instead of JSON');
-        }
-        
-        // Add explicit JSON instruction to prompt for retry
-        const retryPrompt = `${finalPrompt}\n\nIMPORTANT: Return ONLY valid JSON format, no explanatory text.`;
-        const retryRes = await model.generateContent({
-          contents: [{ parts: [{ text: retryPrompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 0.8,
-            maxOutputTokens: 5000
-          }
-        });
-        geminiText = stripThinkTags(await retryRes.response.text());
-      }
-      
-      console.log('[✅ PDF extraction Gemini API call successful]');
-      break;
-    } catch (fetchError) {
-      console.warn(`[⚠️ PDF extraction attempt ${attempt}/${maxRetries} failed]`, fetchError.message);
-      
-      if (attempt === maxRetries) {
-        console.error('[❌ All PDF extraction attempts failed]');
-        throw new Error(`PDF extraction Gemini API failed after ${maxRetries} attempts: ${fetchError.message}`);
-      }
-      
-      // Wait before retry (exponential backoff)
-      const waitTime = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-      console.log(`[⏳ PDF extraction waiting ${waitTime}ms before retry...]`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-  }
-
-  // === Extract contract number ===
-  let docId = 'unknown';
-  try {
-    // Use robust JSON cleaning similar to autoProcessor.js
-    const cleaned = cleanGeminiJson(geminiText);
-    const parsed = JSON.parse(cleaned);
-    if (parsed["Contract Number"]) {
-      docId = parsed["Contract Number"].trim().replace(/\//g, '_');
-    }
-  } catch (err) {
-    console.warn('[Firestore Save] Failed to extract contract number:', err.message);
-  }
-
-  // Helper function for cleaning Gemini JSON responses
-  function cleanGeminiJson(raw) {
-    try {
-      if (!raw) return '{}';
-  
-      let cleaned = raw.trim();
-      
-      // Check for multiple JSON blocks pattern
-      const jsonBlockPattern = /```json\s*(\{[\s\S]*?\})\s*```/gi;
-      const matches = [...cleaned.matchAll(jsonBlockPattern)];
-      
-      if (matches.length > 1) {
-        console.log(`[🔍 Detected ${matches.length} JSON blocks, merging them]`);
-        
-        // Merge multiple JSON objects into one
-        let mergedObject = {};
-        
-        for (const match of matches) {
-          try {
-            const jsonStr = match[1].trim();
-            const parsedBlock = JSON.parse(jsonStr);
-            
-            // Merge this block into the main object
-            mergedObject = { ...mergedObject, ...parsedBlock };
-          } catch (blockErr) {
-            console.warn('[⚠️ Failed to parse individual JSON block]', blockErr.message);
-          }
-        }
-        
-        return JSON.stringify(mergedObject);
-      }
-  
-      // Single block processing (existing logic)
-      // Remove Markdown triple backticks and optional 'json' hint
-      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/g, '');
-  
-      // Remove invalid control characters
-      cleaned = cleaned.replace(/[\u0000-\u001F\u007F]/g, '');
-  
-      // Normalize smart quotes to standard quotes
-      cleaned = cleaned.replace(/[""]/g, '"').replace(/['']/g, "'");
-  
-      // Escape lone backslashes (those not followed by escape characters)
-      cleaned = cleaned.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-  
-      // Remove trailing commas before closing braces/brackets
-      cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-  
-      return cleaned;
-    } catch (err) {
-      console.error('[cleanGeminiJson] ERROR:', err.message);
-      return raw;
-    }
-  }
-
-  // === Save to Firebase ===
-  await db.collection('vision_results').doc(docId).set({
-    timestamp: new Date(),
-    extracted_text: combinedText,
-    gemini_response: geminiText,
-    prompt_key: promptKey,
-  });
-
-  console.log(`[📤 Firebase] Document saved as ID: ${docId}`);
-  res.json({ success: true, text: combinedText, geminiOutput: geminiText });
-});
-
-// ===== NEW SEQUENTIAL PROCESSING ENDPOINTS =====
+// ===== SEQUENTIAL PROCESSING ENDPOINTS =====
 
 // Initialize sequential processor
 const sequentialProcessor = new SequentialProcessor();
@@ -853,25 +651,196 @@ app.post('/api/scrape-url-sequential', async (req, res) => {
     }
 
     const pages = await browser.pages();
-    let popup = pages.find(page => page.url().includes('simplicity'));
+    let popup = pages.find(page => page.url().toLowerCase().includes('simplicity'));
     
     if (!popup) {
-      console.log('[Sequential Web] No existing Simplicity page found, please login first');
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No active Simplicity session found. Please login first via /api/scrape-login' 
-      });
+      console.log('[Sequential Web] No existing Simplicity page found, trying to use main session page');
+      // Try to use the main session page instead of looking for popup
+      const session = browserSessions.get(systemType);
+      if (session && session.page) {
+        popup = session.page;
+        console.log('[Sequential Web] Using main session page');
+      } else {
+        console.log('[Sequential Web] No valid page found, please login first');
+        return res.status(400).json({ 
+          success: false, 
+          message: 'No active Simplicity session found. Please login first via /api/scrape-login' 
+        });
+      }
     }
 
-    // Navigate and scrape (reusing existing logic)
-    const searchUrl = `https://simplicity.lotuss.com/module/lease/offer/view_lease_offer_detail.php?search_data=${contractNumber}`;
+    // Navigate and scrape using the correct domain
+    const searchUrl = `https://mall-management.lotuss.com/Simplicity/module/lease/offer/view_lease_offer_detail.php?search_data=${contractNumber}`;
+    console.log('[Sequential Web] Navigating to:', searchUrl);
+    
     await popup.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 0 });
     
     scrapedText = await popup.evaluate(() => document.body.innerText);
     console.log('[Sequential Web] Scraped content length:', scrapedText.length);
+    console.log('[Sequential Web] Scraped content preview:', scrapedText.substring(0, 500));
+    
+    // Check for 404 errors or other error pages
+    if (scrapedText.includes('HTTP Error 404') || scrapedText.includes('encountered an error')) {
+      console.error('[Sequential Web] Error page detected - 404 or application error');
+      console.log('[Sequential Web] Full error content:', scrapedText);
+      
+      // Try alternative approach: navigate through the menu system
+      console.log('[Sequential Web] Trying alternative navigation through menu system...');
+      
+      try {
+        // Go back to main Simplicity page
+        await popup.goto('https://mall-management.lotuss.com/Simplicity/apptop.aspx', { waitUntil: 'networkidle2' });
+        
+        // Navigate through menu: Lease > Lease Renewal (for LR contracts) or Lease Offer (for LO contracts)
+        const isLeaseOffer = contractNumber.includes('LO');
+        const submenuText = isLeaseOffer ? 'Lease Offer' : 'Lease Renewal';
+        
+        console.log(`[Sequential Web] Navigating to Lease > ${submenuText}...`);
+        
+        // Click on Lease menu
+        await popup.waitForSelector('#menu_MenuLiteralDiv > ul > li:nth-child(10) > a', { timeout: 10000 });
+        await popup.click('#menu_MenuLiteralDiv > ul > li:nth-child(10) > a');
+        await popup.mouse.click(5, 5); // Click away to open submenu
+        
+        // Click on appropriate submenu
+        const selector = isLeaseOffer
+          ? '#menu_MenuLiteralDiv > ul > li:nth-child(10) > ul > li:nth-child(2) > a'
+          : '#menu_MenuLiteralDiv > ul > li:nth-child(10) > ul > li:nth-child(1) > a';
+        
+        await popup.waitForSelector(selector, { timeout: 10000 });
+        await popup.click(selector);
+        
+        // Wait for new page/popup to load
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Get the newly opened page (should be the last one)
+        const pages = await popup.browser().pages();
+        const latestPage = pages[pages.length - 1];
+        
+        // Navigate to the search URL in the new page
+        await latestPage.goto(searchUrl, { waitUntil: 'networkidle2' });
+        scrapedText = await latestPage.evaluate(() => document.body.innerText);
+        
+        console.log('[Sequential Web] Alternative navigation result - Content length:', scrapedText.length);
+        
+        // Close the extra page
+        if (latestPage !== popup) {
+          await latestPage.close();
+        }
+        
+      } catch (navError) {
+        console.error('[Sequential Web] Alternative navigation also failed:', navError.message);
+        // Keep the original 404 content for processing
+      }
+    }
+    
+    // If scraped content is too short, it might indicate page load issues
+    if (scrapedText.length < 500) {
+      console.warn('[Sequential Web] Very short content detected - page might not have loaded properly');
+      console.log('[Sequential Web] Full scraped content:', scrapedText);
+    }
 
-    // Use sequential processing for web data
-    const extractedData = await sequentialProcessor.processSequential(scrapedText, contractType, 'web');
+    // Use single extraction call for web data (not sequential steps)
+    console.log('[Sequential Web] Processing web data with single extraction call');
+    
+    // Create a simplified extraction prompt for web data
+    const extractionPrompt = `Extract all contract information from the following web content and return it as a valid JSON object.
+    
+    Focus on extracting these key fields:
+    - Building Name, Building ID
+    - Contract Number
+    - Brand Name, Property Type
+    - Customer Name, Customer Address
+    - Tenant Type, Space Design Type
+    - Unit ID, Unit Floor, Unit Area
+    - Lease Start Date, Lease End Date
+    - Billing Frequency, Payment Term
+    - Net Rent (p.m.), Service Charge
+    - Deposit Amount, Deposit Type
+    - Include Utility (Yes/No)
+    - Any other relevant contract fields
+    
+    Return ONLY a JSON object with the extracted fields. Use null for missing values.`;
+    
+    const finalPrompt = `${extractionPrompt}\n\nWeb Content:\n${scrapedText}`;
+    
+    // Use Lotus LLM for web data extraction
+    const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
+    const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
+    
+    let extractedData;
+    
+    // If content contains 404 error or is too short, skip LLM processing to avoid socket hang up
+    if (scrapedText.includes('HTTP Error 404') || scrapedText.includes('encountered an error') || scrapedText.length < 100) {
+      console.warn('[Sequential Web] Error page or content too short for meaningful extraction - skipping LLM call');
+      if (scrapedText.includes('HTTP Error 404')) {
+        console.warn('[Sequential Web] 404 Error detected - URL may be incorrect or requires proper navigation');
+      }
+      extractedData = {};
+    } else {
+      // Add 5-second delay before LLM call to prevent too-quick API calls
+      console.log('[Sequential Web] Waiting 5 seconds before calling Lotus LLM to prevent socket hang up...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Try LLM extraction with retry logic
+      const maxRetries = 2;
+      let success = false;
+      
+      for (let attempt = 1; attempt <= maxRetries && !success; attempt++) {
+        try {
+          console.log(`[Sequential Web] Calling Lotus LLM for web data extraction... (attempt ${attempt}/${maxRetries})`);
+          
+          const response = await axios.post(LOTUS_LLM_URL, {
+            model: 'default',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a contract data extraction assistant. Extract data from the provided web content and return it as a valid JSON object only.'
+              },
+              {
+                role: 'user',
+                content: finalPrompt
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 1000, // Further reduced to avoid timeouts
+            extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
+          }, {
+            headers: {
+              'Authorization': `Bearer ${LOTUS_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000 // Reduced to 30 seconds
+          });
+          
+          console.log('[Sequential Web] Lotus LLM call successful');
+          const messageContent = response.data.choices[0].message.content;
+          const reasoningContent = response.data.choices[0].message.reasoning_content;
+          const webResponse = (messageContent || reasoningContent).trim();
+          
+          // Clean and parse the response
+          const cleaned = sequentialProcessor.cleanGeminiJson(webResponse);
+          extractedData = JSON.parse(cleaned);
+          console.log('[Sequential Web] Successfully extracted', Object.keys(extractedData).length, 'fields from web data');
+          success = true;
+          
+        } catch (webExtractionError) {
+          console.error(`[Sequential Web] Web data extraction attempt ${attempt} failed:`, webExtractionError.message);
+          
+          if (webExtractionError.message.includes('socket hang up') || webExtractionError.code === 'ECONNRESET') {
+            console.error('[Sequential Web] Socket hang up/connection reset detected');
+          }
+          
+          if (attempt === maxRetries) {
+            console.error('[Sequential Web] All extraction attempts failed - using empty data');
+            extractedData = {};
+          } else {
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
+    }
     
     // ─── METER CHECK for Sequential Processing ─────────────────
     let utilityRaw = null;
@@ -984,7 +953,8 @@ app.post('/api/scrape-url-sequential', async (req, res) => {
               }
             ],
             temperature: 0.1,
-            max_tokens: 2000
+            max_tokens: 2000,
+            extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
           }, {
             headers: {
               'Content-Type': 'application/json',
@@ -1053,28 +1023,12 @@ app.post('/api/scrape-url-sequential', async (req, res) => {
 
   } catch (err) {
     console.error('[Sequential Web] Error:', err);
-    
-    // Fallback to legacy processing
-    console.log('[Sequential Web] Falling back to legacy processing');
-    try {
-      const fallbackRes = await axios.post('http://localhost:5001/api/scrape-url', {
-        systemType,
-        promptKey: contractType === 'permanent_fixed' ? 'LOI_permanent_fixed_fields' : 'LOI_service_express_fields',
-        contractNumber,
-      });
-      
-      return res.json({
-        ...fallbackRes.data,
-        processingMethod: 'legacy_fallback'
-      });
-    } catch (fallbackErr) {
-      console.error('[Sequential Web] Fallback also failed:', fallbackErr);
-      return res.status(500).json({
-        success: false,
-        message: 'Both sequential and legacy web processing failed',
-        error: err.message
-      });
-    }
+    console.error('[❌ Legacy endpoints have been removed - sequential web scraping must work]');
+    return res.status(500).json({
+      success: false,
+      message: 'Sequential web scraping failed - legacy fallback disabled',
+      error: err.message
+    });
   }
 });
 
@@ -1199,6 +1153,8 @@ app.post('/api/process-sheet', async (req, res) => {
 // ===== Web Scraping (Simplicity Internal Navigation) =====
 // ... (existing imports & setup code remain unchanged)
 
+// LEGACY ENDPOINT REMOVED - Use /api/scrape-url-sequential instead
+/*
 app.post('/api/scrape-url', async (req, res) => {
   console.log('[Simplicity] Incoming request to /api/scrape-url');
   console.log('[Request Body]', req.body);
@@ -1449,7 +1405,8 @@ app.post('/api/scrape-url', async (req, res) => {
               }
             ],
             temperature: 0.1,
-            max_tokens: 5000
+            max_tokens: 5000,
+            extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
           }, {
             headers: {
               'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -1526,6 +1483,7 @@ app.post('/api/scrape-url', async (req, res) => {
     res.status(500).json({ message: 'Error during Simplicity navigation', error: err.message });
   }
 });
+*/
 
 
 
@@ -1858,6 +1816,30 @@ function getFallbackComparisonFields(category) {
       { field: "Total Rent Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
       { field: "Total Service Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
     ],
+    lease_basic: [
+      { field: "Lease Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Billing Frequency", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Monthly charge", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
+    ],
+    lease_years: [
+      { field: "Year 1 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 1 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 1 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 1 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 1 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 2 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 2 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 2 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 2 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 2 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 3 : Contract Start date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 3 : Contract End date", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 3 : Charge Type", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 3 : Monthly Amount of rent", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Year 3 : Monthly Amount of service", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Total Rent Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
+      { field: "Total Service Deposits", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" }
+    ],
     service_charges: [
       { field: "Other service charge (in the renting space)", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
       { field: "Other service charge (in the renting space) Charge description", pdf: "Processing timeout", web: "Processing timeout", match: false, reason: "Category timed out - unable to compare" },
@@ -1883,7 +1865,7 @@ function getFallbackComparisonFields(category) {
   return fallbackData[category] || [{ field: `${category}_fallback`, pdf: "Unknown category", web: "Unknown category", match: false, reason: "Unknown category processed" }];
 }
 
-// === Existing Gemini Compare Endpoint ===
+// LEGACY ENDPOINT REMOVED - Use /api/compare-sequential instead
 app.post('/api/gemini-compare', async (req, res) => {
   console.log('[👁️ HIT /api/gemini-compare]')
   const { formattedSources, promptKey = 'LOI_permanent_fixed_fields', contractNumber, contractType: requestContractType } = req.body;
@@ -1895,7 +1877,7 @@ app.post('/api/gemini-compare', async (req, res) => {
     
     // Use PromptManager to get comparison prompts
     const promptManager = new PromptManager();
-    const comparisonCategories = ['basic', 'lease_terms', 'service_charges', 'utilities', 'tax_deposits'];
+    const comparisonCategories = ['basic', 'lease_basic', 'lease_years', 'service_charges', 'utilities', 'tax_deposits'];
     
     // Prepare sources string once
     const sourcesString = Object.entries(formattedSources)
@@ -1946,7 +1928,8 @@ app.post('/api/gemini-compare', async (req, res) => {
             }
           ],
           temperature: 0.1,
-          max_tokens: 4000 // Further increased for complete field lists
+          max_tokens: 4000, // Further increased for complete field lists
+          extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
         }, {
           headers: {
             'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -2108,7 +2091,8 @@ app.post('/api/gemini-compare', async (req, res) => {
     console.log(`[✅ Lotus LLM comparison complete - ${allResults.length} fields compared]`);
     console.log(`[📊 All comparison fields:`, allResults.map(r => r.field).join(', '));
     console.log(`[📈 Results per category:`, allResults.reduce((acc, r) => {
-      const category = r.field.includes('Year') ? 'lease_terms' : 
+      const category = r.field.includes('Year') || r.field.includes('Total') ? 'lease_years' : 
+                      (r.field === 'Lease Type' || r.field === 'Monthly charge' || r.field === 'Billing Frequency') ? 'lease_basic' :
                       r.field.includes('Deposit') || r.field.includes('tax') ? 'tax_deposits' :
                       r.field.includes('Utility') || r.field.includes('Include') ? 'utilities' :
                       r.field.includes('Service') || r.field.includes('charge') ? 'service_charges' : 'basic';
@@ -2325,7 +2309,8 @@ app.post('/api/validate-modular', async (req, res) => {
             }
           ],
           temperature: 0.1,
-          max_tokens: 6000 // Further increased for complex validation responses
+          max_tokens: 6000, // Further increased for complex validation responses
+          extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
         }, {
           headers: {
             'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -2480,7 +2465,8 @@ Return format: [{"field":"name","value":"val","valid":true/false,"reason":"brief
                 }
               ],
               temperature: 0.1,
-              max_tokens: 1000 // Further reduced to 1000
+              max_tokens: 1000, // Further reduced to 1000
+              extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
             }, {
               headers: {
                 'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -2841,7 +2827,8 @@ console.log('[Utility] scraped raw after combined search:', utilityRaw);
                   role: 'user',
                   content: meterPrompt
                 }
-              ]
+              ],
+              extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
             }, {
               headers: {
                 'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -4269,7 +4256,8 @@ app.post('/api/contract-classify', async (req, res) => {
             }
           ],
           temperature: 0.1,
-          max_tokens: 500
+          max_tokens: 500,
+          extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
         }, {
           headers: {
             'Authorization': `Bearer ${LOTUS_API_KEY}`,
@@ -4520,7 +4508,8 @@ app.post('/api/meter-check', async (req, res) => {
           }
         ],
         temperature: 0.1,
-        max_tokens: 2000
+        max_tokens: 2000,
+        extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
       }, {
         headers: {
           'Content-Type': 'application/json',

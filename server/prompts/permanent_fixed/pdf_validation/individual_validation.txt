@@ -1,0 +1,38 @@
+Validate individual citizen ID requirements and return JSON array.
+
+**FOR INDIVIDUAL CUSTOMERS ONLY:**
+Check "Customer Name": if clearly a person name (given name + surname, no business identifiers) = "Individual"
+
+Required validations for individuals:
+- "Citizen ID Number" - Must be 13 digits exactly
+- "Citizen ID expiration date" - Must be at least 6 months in future  
+- "Name on Citizen ID card" - Must match "Customer Name" (ignore titles like นาย นางสาว)
+- "Address on Citizen ID card" - Valid if present, invalid if empty
+
+Return format:
+[
+  {
+    "field": "Citizen ID Number", 
+    "value": "Extracted 13-digit number",
+    "valid": true or false,
+    "reason": "13 digits validation result"
+  },
+  {
+    "field": "Citizen ID expiration date",
+    "value": "Extracted date",
+    "valid": true or false, 
+    "reason": "Expiration date validation result"
+  },
+  {
+    "field": "Name on Citizen ID card",
+    "value": "Extracted name",
+    "valid": true or false,
+    "reason": "Name matching validation result"
+  },
+  {
+    "field": "Address on Citizen ID card", 
+    "value": "Extracted address",
+    "valid": true or false,
+    "reason": "Address presence validation result"
+  }
+]

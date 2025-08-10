@@ -169,13 +169,28 @@ class SequentialProcessor {
   async callGeminiWithRetry(prompt, maxRetries = 3, skipOnOverload = false) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const geminiRes = await model.generateContent(prompt);
+        console.log(`[Sequential] Gemini API call attempt ${attempt}/${maxRetries}`);
+        
+        // Add timeout wrapper for Gemini API call
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Gemini API timeout after 60 seconds')), 60000);
+        });
+        
+        const geminiPromise = model.generateContent(prompt);
+        const geminiRes = await Promise.race([geminiPromise, timeoutPromise]);
         const responseText = await geminiRes.response.text();
+        
+        console.log(`[Sequential] Gemini API call successful (attempt ${attempt})`);
         return responseText;
       } catch (fetchError) {
         const isServiceOverloaded = fetchError.message && (
           fetchError.message.includes('503 Service Unavailable') || 
           fetchError.message.includes('overloaded')
+        );
+        
+        const isSocketHangUp = fetchError.message && (
+          fetchError.message.includes('socket hang up') ||
+          fetchError.code === 'ECONNRESET'
         );
         
         if (isServiceOverloaded) {
@@ -186,6 +201,9 @@ class SequentialProcessor {
             console.warn('[⚡ Fast-failing due to API overload to preserve resources]');
             throw new Error('GEMINI_OVERLOADED');
           }
+        } else if (isSocketHangUp) {
+          console.warn(`[⚠️ Socket hang up error - attempt ${attempt}/${maxRetries}]`, fetchError.message);
+          console.warn(`[🔌 This may be due to network timeout or connection issues]`);
         } else {
           console.warn(`[⚠️ Sequential Gemini API attempt ${attempt}/${maxRetries} failed]`, fetchError.message);
         }
@@ -194,6 +212,9 @@ class SequentialProcessor {
           if (isServiceOverloaded) {
             console.error('[❌ Gemini API consistently overloaded - please try again later]');
             throw new Error('GEMINI_OVERLOADED');
+          } else if (isSocketHangUp) {
+            console.error('[❌ Persistent socket hang up errors - network/timeout issues]');
+            throw new Error(`Sequential Gemini API socket hang up after ${maxRetries} attempts: ${fetchError.message}`);
           } else {
             console.error('[❌ All Sequential Gemini API attempts failed]');
             throw new Error(`Sequential Gemini API failed after ${maxRetries} attempts: ${fetchError.message}`);
@@ -217,8 +238,7 @@ class SequentialProcessor {
       'lease_terms',
       'service_charges',
       'utilities',
-      'signatures',
-      'citizen_id'
+      'signatures'
     ];
 
     let combinedResult = {};
@@ -280,7 +300,8 @@ class SequentialProcessor {
       'business', 
       'deposits',
       'signatures',
-      'citizen_id'
+      'individual_validation',
+      'corporate_validation'
     ];
 
     let allValidations = [];
@@ -335,7 +356,8 @@ class SequentialProcessor {
   async processComparison(pdfData, webData, contractType = null, contractNumber = null) {
     const comparisonCategories = [
       'basic',
-      'lease_terms',
+      'lease_basic',
+      'lease_years',
       'service_charges', 
       'utilities',
       'tax_deposits'

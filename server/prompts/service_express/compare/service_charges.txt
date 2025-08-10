@@ -1,27 +1,12 @@
-Compare service charges between PDF and Web sources. Return JSON array of comparison results.
+Compare essential service charges between PDF and Web sources. Return JSON array of comparison results.
 
-Compare these fields:
+Compare these basic fields only:
 
-"Other service charge (in the renting space)" - Compare numeric amounts. SPECIAL RULE: Mark as match if PDF value is 0 and Web value is NULL
-
-"Other service charge (in the renting space) Charge description" - Often "ค่าบริการพิเศษสำหรับไอเย็นและไฟฟ้า" matches "Common Area Cool Air Service Fee" - mark as match if same meaning. If charge amount is 0, field can be null
-
-"Other service charge (in the renting space) start date" - If charge not null, should match contract start date
-
-"Other service charge (in the renting space) end date" - If charge not null, should match contract end date
-
-"Other service charge (Common area)" - Compare numeric amounts
-
-"Other service charge (Common area) Charge description" - Often "ค่าบริการสำหรับไอเย็น" matches "Common Area Cool Air Service Fee" - match by context/meaning. If charge amount is 0, field can be null
-
-"Other service charge (Common area) start date" - If charge not null, should match contract start date
-
-"Other service charge (Common area) end date" - If charge not null, should match contract end date
+"Service Charge" - Basic service charge comparison
 
 Special Rules:
-- Match charge descriptions by meaning/context, not exact text
-- Thai "ค่าบริการสำหรับไอเย็น" = English "Common Area Cool Air Service Fee"
-- If charge amount is 0, corresponding description fields are valid as null
+- Focus on main service charges only
+- Skip complex breakdown fields that may not be available in all contracts
 
 Return format:
 [

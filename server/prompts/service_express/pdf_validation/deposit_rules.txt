@@ -18,9 +18,9 @@ Validate deposit rules and return JSON array of validation results.
    - If deposit < 2 × rent: ❌ Invalid "Property Type is not Hypermarket; Tenancy Deposit (<deposit>) is less than 2 × Net Rent (=<expected>)"
    - Else: ✅ Valid "Property Type is not Hypermarket; Tenancy Deposit (<deposit>) ≥ 2 × Net Rent (=<expected>)"
 
-5. **Default Rule**: 
-   - If deposit < 3 × rent: ❌ Invalid "Tenancy Deposit (<deposit>) is less than 3 × Net Rent (=<expected>)"
-   - Else: ✅ Valid "Tenancy Deposit (<deposit>) ≥ 3 × Net Rent (=<expected>)"
+5. **Service Express Rule**: Any non-negative deposit is acceptable
+   - If deposit >= 0: ✅ Valid "Service Express contract; Tenancy Deposit (<deposit>) is acceptable (≥ 0)"
+   - Else: ❌ Invalid "Tenancy Deposit (<deposit>) cannot be negative"
 
 Return format:
 [

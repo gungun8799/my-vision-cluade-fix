@@ -6,7 +6,7 @@ export const config = {
   
   // Enable/disable specific features
   features: {
-    sequentialProcessing: false, // Temporarily disabled due to Gemini API overload
+    sequentialProcessing: true, // Re-enabled now that thinking mode is disabled
     legacyFallback: process.env.ENABLE_LEGACY_FALLBACK !== 'false',
     verboseLogging: process.env.VERBOSE_LOGGING === 'true',
   },

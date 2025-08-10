@@ -8,25 +8,30 @@ const LOTUS_LLM_URL = 'https://api-cpxis.lotuss.com/llm/v1/chat/completions';
 const LOTUS_API_KEY = 'accounting.lotuss.F51DAF28FD6422DDF3CD864F833CC';
 
 async function testLotusAPI() {
-  console.log('🧪 Testing Lotus LLM API availability...\n');
+  console.log('🧪 Testing Lotus LLM API availability with 5-second delay...\n');
+  
+  // Add 5-second delay to match web scraping implementation
+  console.log('⏱️  Waiting 5 seconds before API call to prevent socket hang up...');
+  await new Promise(resolve => setTimeout(resolve, 5000));
   
   const testMessage = {
     model: 'default',
     messages: [
       {
         role: 'system',
-        content: 'You are a helpful assistant. Respond with a simple JSON object.'
+        content: 'You are a contract data extraction assistant. Extract data from the provided web content and return it as a valid JSON object only.'
       },
       {
         role: 'user', 
-        content: 'Test message. Please respond with: {"status": "working", "message": "API is functional"}'
+        content: 'Test web content: Contract Number: 5114_LR2505_00107, Building Name: Test Building. Please extract this information as JSON.'
       }
     ],
     temperature: 0.1,
-    max_tokens: 100
+    max_tokens: 1000,
+    extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
   };
 
-  console.log('📡 Sending test request to Lotus LLM...');
+  console.log('📡 Sending test request to Lotus LLM (with thinking disabled)...');
   console.log('URL:', LOTUS_LLM_URL);
   console.log('Request body:', JSON.stringify(testMessage, null, 2));
   
@@ -38,7 +43,7 @@ async function testLotusAPI() {
         'Authorization': `Bearer ${LOTUS_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 30000 // 30 second timeout (matches web scraping implementation)
     });
     
     const endTime = Date.now();
@@ -50,18 +55,23 @@ async function testLotusAPI() {
     console.log('📨 Response data:', JSON.stringify(response.data, null, 2));
     
     // Check if response contains expected content
-    const content = response.data?.choices?.[0]?.message?.content;
+    const messageContent = response.data?.choices?.[0]?.message?.content;
+    const reasoningContent = response.data?.choices?.[0]?.message?.reasoning_content;
+    const content = (messageContent || reasoningContent);
+    
     if (content) {
-      console.log('💬 Message content:', content);
+      console.log('💬 Response content:', content);
       try {
-        const parsed = JSON.parse(content);
-        if (parsed.status === 'working') {
-          console.log('🎉 API responded correctly with expected JSON format!');
+        const parsed = JSON.parse(content.trim());
+        if (parsed['Contract Number'] === '5114_LR2505_00107') {
+          console.log('🎉 API responded correctly with expected contract data extraction!');
         } else {
-          console.log('⚠️  API responded but not with expected content');
+          console.log('⚠️  API responded with JSON but not expected contract data');
+          console.log('📋 Extracted data:', parsed);
         }
       } catch (e) {
         console.log('⚠️  API responded but content is not valid JSON');
+        console.log('🔍 Raw content for debugging:', content);
       }
     }
     

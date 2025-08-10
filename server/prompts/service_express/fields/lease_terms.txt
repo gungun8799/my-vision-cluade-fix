@@ -14,14 +14,3 @@ Find row where 'CHARGE DESCRIPTION' is exactly 'Monthly Amount'. Extract value b
 Formula: TOTAL AMOUNT INCLUDING TAX − TAX AMOUNT = Monthly Amount of Service
 
 "Deposit Amount" - Total deposit amount
-
-**CRITICAL**: You MUST return a complete JSON object containing ALL the fields listed above. Do not return partial results or skip fields. If a field cannot be determined, use "NULL" as the value.
-
-**REQUIRED JSON FORMAT:**
-{
-  "Lease Type": "Service Express",
-  "Lease property tax rate": "value",
-  "Monthly charge": "Yes" or "No", 
-  "Charge Type": "Service Charge-Fixed",
-  "Deposit Amount": "value"
-}

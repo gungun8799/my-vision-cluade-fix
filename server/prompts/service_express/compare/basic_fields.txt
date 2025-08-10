@@ -1,24 +1,38 @@
 Compare basic fields between PDF and Web sources for SERVICE EXPRESS contracts. Return JSON array of comparison results.
 
-Compare these fields with flexible matching (allow contextual similarity, different formats):
+Compare ALL these fields with flexible matching (allow contextual similarity, different formats):
 
-"Building Name" - If field "อยู่กองทรัสต์หรือไม่" is "Yes", just validate as valid (contains word "ซีพี")
+"Building Name" - Building name comparison. If field "อยู่กองทรัสต์หรือไม่" is "Yes", just validate as valid (contains word "ซีพี")
+
+"Building ID" - 4-digit building ID comparison
+
+"อยู่กองทรัสต์หรือไม่" - Compare REIT status ("Yes" or "No"). Must match exactly between PDF and Web.
+
+"แบบสัญญากองทรัสต์" - Trust contract format comparison
+
+"Contract Number" - Format: "xxxx_LOxxxx_xxxxx" or "xxxx_LRxxxx_xxxxx" comparison
 
 "Brand Name" - ชื่อร้าน or brand name comparison
+
+"Property Type" - Property type designation comparison
 
 "Customer Name" - Compare customer names
 
 "Customer Address" - Compare customer addresses normally
 
+"Individual or Corporate" - Individual vs Corporate status comparison
+
+"แนบหนังสือรับรองบริษัท" - Corporate certificate attachment comparison
+
 "Unit ID" - Format PXXXX comparison
 
 "Space (NLA)" - Area in square meters comparison
 
-"Tenant Type" - Find near Unit Number starting with "PN", extract descriptive portion after dash. For web: extract after "PN7 -", for example "PN7 - PN Furniture" → "Furniture"
-
 "Proposed lease commencement date" - Compare as calendar dates
 
 "Proposed lease expiry date" - Compare as calendar dates
+
+"Tenant Type" - Find near Unit Number starting with "PN", extract descriptive portion after dash. For web: extract after "PN7 -", for example "PN7 - PN Furniture" → "Furniture"
 
 Flexible comparison rules:
 - Match contextually similar values even if formatted differently

@@ -1,0 +1,38 @@
+Validate corporate certificate requirements and return JSON array.
+
+**FOR CORPORATE CUSTOMERS ONLY:**
+Check "Customer Name": if contains business terms (Co., Ltd., Inc., Corporation) = "Corporate"
+
+Required validations for corporations:
+- "Company Registration Number" - Must be 10-15 digits
+- "Company Certificate issued date" - Must be valid date and not more than 6 months old
+- "แนบหนังสือรับรองบริษัท" - Check if PDF includes corporate certificate: present = "Yes"/valid, absent = "No"/invalid
+- "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่" - Look for stamps, seals, or official markings: found = "Yes"/valid, absent = "No"/invalid
+
+Return format:
+[
+  {
+    "field": "Company Registration Number",
+    "value": "Extracted registration number", 
+    "valid": true or false,
+    "reason": "Registration number format validation"
+  },
+  {
+    "field": "Company Certificate issued date",
+    "value": "Extracted date",
+    "valid": true or false,
+    "reason": "Certificate date validation"
+  },
+  {
+    "field": "แนบหนังสือรับรองบริษัท",
+    "value": "Yes or No",
+    "valid": true or false,
+    "reason": "Certificate attachment validation"
+  },
+  {
+    "field": "มีตราประทับบนหนังสือรับรองบริษัทหรือไม่", 
+    "value": "Yes or No",
+    "valid": true or false,
+    "reason": "Stamp presence validation"
+  }
+]

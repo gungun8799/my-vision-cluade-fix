@@ -1,0 +1,34 @@
+Compare basic lease terms between PDF and Web sources. Return JSON array of comparison results.
+
+Compare these fields:
+
+"Lease Type" - Check "4. ค่าเช่าและบริการ" for payment condition "Permanent Fixed" vs other
+
+"Billing Frequency" - If contract number contains "LR": mark as Match if Web info is NULL, otherwise compare normally
+
+"Monthly charge" - Output "Yes" or "No" comparison
+
+Return format:
+[
+  {
+    "field": "Lease Type",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation of comparison logic"
+  },
+  {
+    "field": "Billing Frequency",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  },
+  {
+    "field": "Monthly charge",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  }
+]

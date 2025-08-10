@@ -305,37 +305,14 @@ async function processOneContract(filename) {
       } catch (err) {
         console.warn('[⚠️ Sequential processing failed]', err.response?.data || err.message);
         
-        if (useFallback) {
-          console.log('[🔄 Falling back to legacy processing]');
-          // Fallback to legacy processing
-          // contractType already appended at line 138
-          try {
-            extractRes = await axios.post(
-              'http://localhost:5001/api/extract-text',
-              extractForm,
-              { 
-                headers: extractForm.getHeaders(),
-                timeout: 10800000 // 3 hours timeout (effectively infinite) for response for large PDF processing
-              }
-            );
-            console.log('[✅ Legacy fallback successful]');
-          } catch (legacyErr) {
-            console.error('[❌ Both sequential and legacy processing failed]', legacyErr.response?.data || legacyErr.message);
-            throw legacyErr;
-          }
-        } else {
-          throw err;
-        }
+        console.error('[❌ Legacy endpoints have been removed - sequential processing must work]');
+        throw err; // Don't fallback, force fix
       }
     } else {
-      // Use legacy processing directly
-      logInfo('Using legacy processing (sequential disabled)');
-      // contractType already appended at line 138
-      extractRes = await axios.post(
-        'http://localhost:5001/api/extract-text',
-        extractForm,
-        { headers: extractForm.getHeaders() }
-      );
+      // Force sequential processing only
+      console.error('[❌ Legacy extraction disabled - processingMethod should be sequential]');
+      console.error('[🔧 Fix: Enable sequential processing in config.js]');
+      throw new Error('Legacy extraction has been removed. Sequential processing must be enabled.');
     }
     
     const geminiOut = extractRes.data.geminiOutput
@@ -408,26 +385,15 @@ async function processOneContract(filename) {
         parsedWeb = scrapeRes.data.extractedData;
         console.log('[✅ Sequential web scrape complete]');
       } catch (err) {
-        console.warn('[⚠️ Sequential web scraping failed, falling back to legacy]', err.response?.data || err.message);
-        // Fallback to legacy scraping
-        scrapeRes = await axios.post('http://localhost:5001/api/scrape-url', {
-          systemType: 'simplicity',
-          contractType,
-          contractNumber: extractedContractNumber,
-        }, {
-          timeout: 0 // No timeout - wait indefinitely
-        });
+        console.error('[❌ Sequential web scraping failed with error:]', err.response?.data || err.message);
+        console.error('[❌ Legacy endpoints have been removed - sequential scraping must work]');
+        throw err; // Don't fallback, force fix
       }
     } else {
-      // Legacy scraping
-      console.log('[🔄 Using legacy web scraping]');
-      scrapeRes = await axios.post('http://localhost:5001/api/scrape-url', {
-        systemType: 'simplicity',
-        contractType,
-        contractNumber: extractedContractNumber,
-      }, {
-        timeout: 0 // No timeout - wait indefinitely
-      });
+      // Force sequential processing only
+      console.error('[❌ Legacy web scraping disabled - processingMethod should be sequential]');
+      console.error('[🔧 Fix: Enable sequential processing in config.js]');
+      throw new Error('Legacy web scraping has been removed. Sequential processing must be enabled.');
     }
     
     if (!scrapeRes.data.success) {
@@ -554,61 +520,20 @@ async function processOneContract(filename) {
         compareResult = cmpRes.data.comparison;
         console.log('[✅ Sequential comparison complete]');
       } catch (err) {
-        console.warn('[⚠️ Sequential comparison failed, falling back to legacy]', err.message);
-        // Fallback to legacy comparison
-        const formattedSources = { pdf: parsedPdf, web: parsedWeb };
-        const cmpRes = await axios.post('http://localhost:5001/api/gemini-compare', {
-          formattedSources,
-          contractType,
-          contractNumber: extractedContractNumber,
+        console.error('[❌ Sequential comparison failed with detailed error:]', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config?.url
         });
-        const rawOutput = cmpRes.data.response;
-        const cleaned = cleanGeminiJson(rawOutput);
-        compareResult = JSON.parse(cleaned);
+        console.error('[❌ Legacy endpoints have been removed - sequential comparison must work]');
+        throw err; // Don't fallback, force fix
       }
     } else {
-      // Legacy comparison
-      console.log('[🔄 Using legacy comparison]');
-      const formattedSources = { pdf: parsedPdf, web: parsedWeb };
-      const cmpRes = await axios.post('http://localhost:5001/api/gemini-compare', {
-        formattedSources,
-        contractType,
-        contractNumber: extractedContractNumber,
-      }, {
-        timeout: 10800000 // 3 hours timeout (effectively infinite) for comparison response
-      });
-      
-      const rawOutput = cmpRes.data.response;
-      
-      // Check if response is already a JSON string (from chunked Lotus)
-      let cleaned = rawOutput;
-      if (typeof rawOutput === 'string' && !rawOutput.trim().startsWith('[')) {
-        cleaned = cleanGeminiJson(rawOutput);
-      }
-      
-      try {
-        compareResult = JSON.parse(cleaned);
-      } catch (err) {
-        console.error('[❌ Failed to parse sanitized compare JSON]', err.message);
-        console.error('[🧨 Raw Compare Gemini Output]', rawOutput);
-      
-        // 🩹 Aggressive patch for unterminated "reason": "
-        let patched = cleaned.replace(/"reason"\s*:\s*"[^"]*$/g, '"reason": ""');
-      
-        // ✅ Truncate the string at the last closing array bracket
-        const endIndex = patched.lastIndexOf(']');
-        if (endIndex !== -1) {
-          patched = patched.slice(0, endIndex + 1);
-        }
-      
-        try {
-          compareResult = JSON.parse(patched);
-          console.warn('[⚠️ JSON parse succeeded after aggressive patch]');
-        } catch (finalErr) {
-          console.error('[❌ JSON still invalid after patch]', finalErr.message);
-          throw finalErr;
-        }
-      }
+      // Force sequential processing only
+      console.error('[❌ Legacy comparison disabled - processingMethod should be sequential]');
+      console.error('[🔧 Fix: Enable sequential processing in config.js]');
+      throw new Error('Legacy comparison has been removed. Sequential processing must be enabled.');
     }
 
 

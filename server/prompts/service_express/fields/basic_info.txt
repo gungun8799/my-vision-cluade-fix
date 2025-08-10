@@ -30,3 +30,5 @@ Required fields:
 "Proposed lease commencement date" - Start date of lease
 
 "Proposed lease expiry date" - End date of lease
+
+"Tenant Type" - Find near Unit Number starting with "PN", extract descriptive portion after dash. For web: extract after "PN7 -", for example "PN7 - PN Furniture" → "Furniture"

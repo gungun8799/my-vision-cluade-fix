@@ -1,0 +1,43 @@
+Compare basic lease terms between PDF and Web sources for SERVICE EXPRESS contracts. Return JSON array of comparison results.
+
+Compare these fields:
+
+"Lease Type" - Should be "Service Express" for both PDF and Web
+
+"Monthly charge" - Output "Yes" or "No" comparison
+
+"Charge Type" - Compare service charge types
+
+"Deposit Amount" - Compare deposit amounts
+
+Return format:
+[
+  {
+    "field": "Lease Type",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation of comparison logic"
+  },
+  {
+    "field": "Monthly charge",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  },
+  {
+    "field": "Charge Type",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  },
+  {
+    "field": "Deposit Amount",
+    "pdf": "PDF value", 
+    "web": "Web value",
+    "match": true or false,
+    "reason": "Explanation"
+  }
+]

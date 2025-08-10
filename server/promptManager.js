@@ -62,8 +62,7 @@ class PromptManager {
       lease_terms: 'lease_terms.txt',
       service_charges: 'service_charges.txt',
       utilities: 'utilities.txt',
-      signatures: 'signatures.txt',
-      citizen_id: 'citizen_id.txt'
+      signatures: 'signatures.txt'
     };
 
     if (!stepPrompts[step]) {
@@ -91,7 +90,8 @@ class PromptManager {
       business: 'business_rules.txt', 
       deposits: 'deposit_rules.txt',
       signatures: 'signature_validation.txt',
-      citizen_id: 'citizen_id_validation.txt',
+      individual_validation: 'individual_validation.txt',
+      corporate_validation: 'corporate_validation.txt',
       data_completeness: 'data_completeness.txt'
     };
 
@@ -102,8 +102,8 @@ class PromptManager {
     const filename = validationCategories[category];
     const validationType = sourceType === 'web' ? 'web_validation' : 'pdf_validation';
     
-    // For web validation, skip signature and citizen_id categories as they're not available in web data
-    if (sourceType === 'web' && (category === 'signatures' || category === 'citizen_id')) {
+    // For web validation, skip signature and citizen ID categories as they're not available in web data
+    if (sourceType === 'web' && (category === 'signatures' || category === 'individual_validation' || category === 'corporate_validation')) {
       console.log(`[PromptManager] Skipping ${category} validation for web data (not available)`);
       return null;
     }
@@ -128,6 +128,8 @@ class PromptManager {
     const comparisonCategories = {
       basic: 'basic_fields.txt',
       lease_terms: 'lease_terms.txt',
+      lease_basic: 'lease_basic.txt',
+      lease_years: 'lease_years.txt',
       service_charges: 'service_charges.txt',
       utilities: 'utilities.txt',
       tax_deposits: 'tax_deposits.txt'
@@ -177,7 +179,7 @@ class PromptManager {
       throw new Error('Contract type is required for legacy prompts');
     }
 
-    const steps = ['basic_info', 'tenant_info', 'lease_terms', 'service_charges', 'utilities', 'signatures', 'citizen_id'];
+    const steps = ['basic_info', 'tenant_info', 'lease_terms', 'service_charges', 'utilities', 'signatures'];
     const prompts = [];
     
     for (const step of steps) {
@@ -204,7 +206,7 @@ class PromptManager {
   // Assemble validation prompts (legacy compatibility)
   assembleValidationPrompts(contractType = 'permanent_fixed', sourceType = 'pdf') {
     console.warn('[PromptManager] assembleValidationPrompts is deprecated, use createValidationPrompt instead');
-    const categories = ['required', 'business', 'deposits', 'signatures', 'citizen_id'];
+    const categories = ['required', 'business', 'deposits', 'signatures', 'individual_validation', 'corporate_validation'];
     const prompts = [];
     
     for (const category of categories) {
