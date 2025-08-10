@@ -25,14 +25,34 @@ function stripThinkTags(response) {
     return response;
   }
   
-  // Remove everything between <think> and </think> tags (including the tags themselves)
-  // This handles both single-line and multi-line thinking sections
+  console.log('[DEBUG stripThinkTags] Input length:', response.length);
+  console.log('[DEBUG stripThinkTags] First 200 chars:', response.substring(0, 200));
+  console.log('[DEBUG stripThinkTags] Last 200 chars:', response.substring(response.length - 200));
+  
+  // First, remove properly closed <think>...</think> tags
   let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
   
-  // Also handle unclosed think tags - remove from <think> to end of response
-  cleaned = cleaned.replace(/<think>[\s\S]*$/gi, '');
+  // For unclosed think tags, try to preserve JSON content that comes after
+  if (cleaned.includes('<think>')) {
+    console.log('[DEBUG stripThinkTags] Found unclosed think tag');
+    
+    // Look for JSON array or object after any <think> tag
+    const jsonMatch = cleaned.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+    if (jsonMatch) {
+      console.log('[DEBUG stripThinkTags] Found JSON content, preserving it');
+      cleaned = jsonMatch[0];
+    } else {
+      // If no JSON found, still try to remove the unclosed think section
+      console.log('[DEBUG stripThinkTags] No JSON found, removing unclosed think section');
+      cleaned = cleaned.replace(/<think>[\s\S]*$/gi, '');
+    }
+  }
   
-  return cleaned.trim();
+  const result = cleaned.trim();
+  console.log('[DEBUG stripThinkTags] Output length:', result.length);
+  console.log('[DEBUG stripThinkTags] Output preview:', result.substring(0, 200));
+  
+  return result;
 }
 
 
@@ -2198,6 +2218,46 @@ app.post('/api/validate-modular', async (req, res) => {
         
       } catch (err) {
         console.error(`[❌ Failed to process validation category ${category}]`, err.message);
+        
+        // Handle 504 Gateway Timeout specifically
+        if (err.response && err.response.status === 504) {
+          console.log(`[🔄 Retrying ${category} with reduced token limit due to 504 timeout]`);
+          try {
+            // Retry with smaller max_tokens to avoid gateway timeout
+            const retryResponse = await axios.post(LOTUS_LLM_URL, {
+              model: 'default',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a contract validation assistant. Return ONLY a valid JSON array. Be concise.'
+                },
+                {
+                  role: 'user',
+                  content: finalPrompt
+                }
+              ],
+              temperature: 0.1,
+              max_tokens: 2000 // Reduced from 6000 to 2000
+            }, {
+              headers: {
+                'Authorization': `Bearer ${LOTUS_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 60000 // 60 second timeout instead of infinite
+            });
+            
+            const retryResult = stripThinkTags(retryResponse.data.choices[0].message.content);
+            console.log(`[🔄 ${category} retry response length:`, retryResult.length);
+            
+            const retryParsed = JSON.parse(retryResult);
+            if (Array.isArray(retryParsed)) {
+              allValidationResults.push(...retryParsed);
+              console.log(`[✅ ${category} retry successful - ${retryParsed.length} validation items]`);
+            }
+          } catch (retryErr) {
+            console.warn(`[⚠️ ${category} retry also failed:`, retryErr.message);
+          }
+        }
       }
     }
     
